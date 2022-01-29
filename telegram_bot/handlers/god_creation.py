@@ -1,3 +1,4 @@
+import aiogram.utils.exceptions
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram import types, Dispatcher
@@ -5,13 +6,12 @@ from aiogram import types, Dispatcher
 from telegram_bot.utils import get_controller
 from telegram_bot.keyboards import get_one_button_keyboard
 from telegram_bot.handlers.world import create_world
-from telegram_bot.handlers.god_actions import CB_START_ACTION, GodActionOrder
+from telegram_bot.handlers.god_actions import render_god_info
 
-# todo
+
 MAX_GOD_NAME_LEN = 30
 
 CMD_GOD_INFO = 'god_info'
-
 CB_CREATE_GOD = 'create_god'
 
 
@@ -36,7 +36,7 @@ class GodCreationOrder(StatesGroup):
             return
 
         if controller.current_god:
-            await _render_god_info(call.message)
+            await render_god_info(call.message)
             return
 
         await self.name.set()
@@ -47,11 +47,15 @@ class GodCreationOrder(StatesGroup):
     async def set_god_name(message: types.Message, state: FSMContext):
         if len(message.text) > MAX_GOD_NAME_LEN:
             await message.answer(f'Имя бога должно быть не больше {MAX_GOD_NAME_LEN} символов')
+            return
 
         controller = get_controller(message)
-        controller.add_god(message.text)
+        if not controller.add_god(message.text):
+            await message.answer(f'Уже есть бог с именем {message.text}, выберите другое')
+            return
+
         await state.finish()
-        await _render_god_info(message)
+        await render_god_info(message)
 
 
 async def cmd_get_god(message: types.Message, state: FSMContext):
@@ -60,24 +64,22 @@ async def cmd_get_god(message: types.Message, state: FSMContext):
         await create_world(message)
         return
     if not controller.current_god:
+        if controller.world.is_start_game:
+            await message.answer(
+                'У вас нет бога. \n'
+                'К сожалению, после начала игры нельзя создавать богов, '
+                'дождитесь пока администраторы создадут новый мир и успейте до начала игры.')
+            return
+
         await GodCreationOrder.start.set()
         await message.answer(
             'У вас еще нет бога.',
-            reply_markup=get_one_button_keyboard('Создать бога', 'create_god')
+            reply_markup=get_one_button_keyboard('Создать бога', CB_CREATE_GOD)
         )
         return
 
-    await _render_god_info(message)
+    await render_god_info(message)
 
 
-async def _render_god_info(message: types.Message):
-    controller = get_controller(message)
-    keyboard = None
-    if controller.is_allowed_to_act():
-        keyboard = get_one_button_keyboard(text="Начать ход", callback_data=CB_START_ACTION)
-        await GodActionOrder.start.set()
 
-    await message.answer(
-        controller.current_god.info,
-        reply_markup=keyboard
-    )
+

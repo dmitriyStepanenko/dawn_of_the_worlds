@@ -1,8 +1,12 @@
 from PIL import Image, ImageDraw
+
+from .model import Layer
 from .tiles import LandType
 from .tiles import ClimateType
 from .tiles import InitPositionRaceTile
 from pathlib import Path
+
+from .utils import get_coord_from_position
 
 
 class ImageCollection:
@@ -75,3 +79,18 @@ class ImageManager:
         draw.line(((0, shape[1] * y_coeff), (size[1], shape[1] * y_coeff)), fill='black', width=2)
 
         return image
+
+    @staticmethod
+    def render_layer(layer: Layer, images: ImageCollection):
+        world_map_image = Image.new(
+            'RGBA',
+            (images.image_size[0] * layer.shape[0], images.image_size[1] * layer.shape[1])
+        )
+        for tile in layer.tiles:
+            if tile.image_ref is not None:
+                y_pos, x_pos = get_coord_from_position(tile.position, layer.shape[0])
+                world_map_image.paste(
+                    images.get_image(tile.image_ref),
+                    (x_pos * images.image_size[0], y_pos * images.image_size[1]),
+                )
+        return world_map_image

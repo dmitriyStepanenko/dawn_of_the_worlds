@@ -6,16 +6,10 @@ from pydantic import Field
 
 
 class Tile(BaseModel):
-    x_pos: int = Field(...)
-    y_pos: int = Field(...)
+    position: int = Field(...)
     image_ref: str = Field(None)
     creator: str = Field(None)
-    # TODO: name
     name: str = Field(None)
-
-    @property
-    def position(self):
-        return self.x_pos, self.y_pos
 
     def __str__(self):
         return str(self.position)
@@ -54,8 +48,9 @@ class ClimateType(Enum):
 
 
 class InitPositionRaceTile(Tile):
-    def __init__(self, x_pos: int, y_pos: int):
-        super(InitPositionRaceTile, self).__init__(x_pos=x_pos, y_pos=y_pos, image_ref=self.__class__.__name__)
+    def __init__(self, **data: Any):
+        super(InitPositionRaceTile, self).__init__(**data)
+        self.image_ref = self.__class__.__name__
 
 
 TILES = Union[

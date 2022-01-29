@@ -1,13 +1,7 @@
-import datetime
-from enum import Enum
-
 from .model import Actions, GodProfile, Race, Avatar, World
 from .tiles import InitPositionRaceTile, Tile, TerrainTile, LandType
 from .world_manager import WorldManager
 from storage.storage import Storage
-
-
-BlOCK_TIME_DELTA = datetime.timedelta(minutes=1)
 
 
 class Controller:
@@ -44,38 +38,52 @@ class Controller:
     def remove_world(self):
         self.storage.remove_world(self._world_id)
 
+    def start_game(self):
+        self.world.is_start_game = True
+        self.save()
+
     def add_god(self, name: str):
+        if name in self.world.god_names:
+            return None
         god = GodProfile(name=name)
-        god.receive_force()
         self.world_manager.add_god_profile(god, self._god_id)
+        self.world_manager.receive_force(self._god_id)
+        if self.world.redactor_god_id is None:
+            self.world.redactor_god_id = self._god_id
+        self.save()
+        return god
+
+    def next_redactor_god(self):
+        god_ids = [god_id for god_id, god in self.world.gods.items() if not god.confirm_end_round]
+        index = god_ids.index(self._god_id)
+        index = index + 1 if index < len(god_ids) - 1 else 0
+
+        self.world.redactor_god_id = god_ids[index]
         self.save()
 
-    def set_redactor_god(self):
-        self.world.redactor_god_name = self.current_god.name
-        self.world.time_block = datetime.datetime.now()
+    def set_current_message_id(self, message_id):
+        self.world.current_message_with_buttons_id = message_id
         self.save()
 
-    def remove_redactor_god(self):
-        if not self.collect_allowed_actions():
-            self.current_god.confirm_end_round = True
-
-        self.world.redactor_god_name = ''
-        self.world.time_block = datetime.datetime.min
-        self.save()
-
+    @property
     def is_allowed_to_act(self):
-        if self.world_manager.is_creation_end or not self.collect_allowed_actions():
+        if self.world_manager.is_creation_end or not self.world.is_start_game:
             return False
 
         if self.current_god.confirm_end_round:
             return False
 
-        is_redaction_time_out = datetime.datetime.now() - BlOCK_TIME_DELTA > self.world.time_block
-        return self.world.redactor_god_name in [self.current_god.name, ''] or is_redaction_time_out
+        return self._god_id == self.world.redactor_god_id
+
+    @property
+    def is_allowed_to_end_era(self):
+        return self.world.n_round > 4 and not self.current_god.confirm_end_era
 
     def end_round(self):
         self.current_god.confirm_end_round = True
-        for other_god in self.world_manager.world.gods.values():
+        for other_god_id, other_god in self.world_manager.world.gods.items():
+            if other_god_id == self._god_id:
+                continue
             if not other_god.confirm_end_round:
                 self.save()
                 return None
@@ -92,16 +100,17 @@ class Controller:
         self.save()
 
     def collect_allowed_actions(self):
-        allowed_actions = [
-            action.name for action in Actions
-            if action.value.costs[self.world.n_era] < self.current_god.value_force
-        ]
-        return allowed_actions
+        if self.is_allowed_to_act:
+            return [
+                action.name for action in Actions
+                if action.value.costs[self.world.n_era] <= self.current_god.value_force
+            ]
+        return []
 
     def form_land(self, tile_type: str, tile_num: int):
+        # todo move constant
         layer_name = 'lands'
 
-        # todo move it
         land_types = {
             LandType.WATER.value: LandType.WATER,
             LandType.FOREST.value: LandType.FOREST,
@@ -109,22 +118,14 @@ class Controller:
             LandType.ROCK.value: LandType.ROCK,
             LandType.PLATEAU.value: LandType.PLATEAU,
         }
-        layer = self.world_manager.get_layer(layer_name)
-        y_pos, x_pos = divmod(tile_num, layer.shape[0])
-        tile = TerrainTile(x_pos=x_pos, y_pos=y_pos, type_land=land_types[tile_type])
+        tile = TerrainTile(position=tile_num, type_land=land_types[tile_type])
 
-        cost_coefficient = self.world_manager.calc_action_cost_coefficient(layer_name, tile, self.current_god)
-        force_value = self.world_manager.calc_action_cost(Actions.CREATE_LAND) * cost_coefficient
-        self.current_god.check_force_enough(force_value)
+        force_value = self.world_manager.calc_action_cost(Actions.CREATE_LAND)
         tile.creator = self.current_god.name
         self.world_manager.change_tile(layer_name, tile)
 
-        self.current_god.spend_force(force_value)
-        if cost_coefficient == 1:
-            message = f'{self.current_god} создал {tile} в координатах {tile.position}'
-        else:
-            message = f'{self.current_god} изменил ландшафт в координатах {tile.position} на {tile}'
-        self.world_manager.log(message)
+        self.world_manager.spend_force(god_id=self._god_id, value=force_value)
+        self.world_manager.log(f'{self.current_god} изменил ландшафт в координатах {tile.position} на {tile}')
         self.save()
 
     #
@@ -185,7 +186,7 @@ class Controller:
     #     tile = race.apply_action(race_action)
     #
     #     if tile is not None:
-    #         layer_name = ... # todo
+    #         layer_name = ...
     #         layer = self.world_manager.get_layer(layer_name)
     #         layer.replace_tile(tile)
     #
@@ -202,7 +203,6 @@ class Controller:
     #     force_value = self.world_manager.calc_action_cost(Actions.CONTROL_CITY)
     #     god.check_force_enough(force_value)
     #     tile = city.apply_action()
-    #     # todo
     #
     # def develop_race(self, god: GodProfile, race_name: str, technology: str):
     #     race = self.world_manager.get_race(race_name)

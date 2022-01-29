@@ -1,15 +1,15 @@
+from typing import Union
+
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import StatesGroup, State
 
-from telegram_bot.utils import get_controller, convert_image, get_god_name_from_message
+from telegram_bot.utils import get_controller, convert_image, remove_buttons_from_current_message_with_buttons
 
-from world_creator.controller import Controller
 from world_creator.tiles import LandType
 from world_creator.model import Actions
 
-CB_START_ACTION = 'start_action'
 CB_END_ACTION = 'end_action'
 CB_SPEND_FORCE = 'spend_force'
 CB_FORM_LAND = 'form_land'
@@ -25,13 +25,9 @@ def register_handlers_god_actions(dispatcher: Dispatcher):
 
 
 class GodActionOrder(StatesGroup):
-    start = State()
     act = State()
 
     def register(self, dispatcher: Dispatcher):
-        dispatcher.register_callback_query_handler(
-            self.start_action_callback, text=CB_START_ACTION, state=self.start
-        )
         dispatcher.register_callback_query_handler(
             self.spend_force_callback, text=CB_SPEND_FORCE, state=self.act
         )
@@ -45,58 +41,17 @@ class GodActionOrder(StatesGroup):
             self.end_era_callback, text=CB_END_ERA, state=self.act
         )
 
-    async def start_action_callback(self, call: types.CallbackQuery):
-        controller = get_controller(call)
-        god_name = get_god_name_from_message(call.message)
-        if god_name != controller.current_god.name:
-            await call.answer('Эта кнопка управляет чужим богом, найдите вашу или заведите новую')
-            return
-        if controller.is_allowed_to_act():
-            controller.set_redactor_god()
-            # сброс состояний всем богам кроме текущего
-            await remove_all_god_action_states(call)
-
-            buttons = [
-                types.InlineKeyboardButton(text="Потратить силу", callback_data=CB_SPEND_FORCE),
-                types.InlineKeyboardButton(text="Завершить ход", callback_data=CB_END_ACTION),
-                types.InlineKeyboardButton(text="Завершить раунд", callback_data=CB_END_ROUND),
-            ]
-            keyboard = types.InlineKeyboardMarkup(row_width=1)
-            if controller.world.n_round > 4 and not controller.current_god.confirm_end_era:
-                buttons.append(types.InlineKeyboardButton(text="Завершить эпоху", callback_data=CB_END_ERA))
-            keyboard.add(*buttons)
-            await self.act.set()
-            await call.message.edit_reply_markup(keyboard)
-            await call.answer()
-        else:
-            await call.message.edit_reply_markup(None)
-            await call.answer('Сейчас чужой ход')
-
     @staticmethod
     async def end_action_callback(call: types.CallbackQuery, state: FSMContext):
         controller = get_controller(call)
-        controller.remove_redactor_god()
+        controller.next_redactor_god()
         await call.message.edit_reply_markup(None)
         await state.finish()
         await call.answer()
 
     @staticmethod
     async def end_round_callback(call: types.CallbackQuery, state: FSMContext):
-        controller = get_controller(call)
-        n_round = controller.world.n_round
-        n_era = controller.world.n_era
-        controller.end_round()
-        controller.remove_redactor_god()
-
-        await call.message.edit_reply_markup(None)
-        await state.finish()
-        if controller.world_manager.is_creation_end:
-            await call.message.answer('Мир создан')
-        elif n_round < controller.world.n_round:
-            await call.message.answer('Начался новый раунд, боги получили силу, мир стал старше')
-        elif n_era < controller.world.n_era:
-            await call.message.answer('Началась новая эпоха, время теперь течет быстрее')
-        await call.answer()
+        await _end_round_answer(call)
 
     @staticmethod
     async def end_era_callback(call: types.CallbackQuery):
@@ -162,8 +117,7 @@ class OrderFormLand(StatesGroup):
         tile_num = int(message.text)
 
         controller = get_controller(message)
-        shape = controller.world.layers['lands'].shape
-        max_num = shape[0] * shape[1]
+        max_num = controller.world.layers['lands'].num_tiles
         if max_num < tile_num < 0:
             await message.answer(f'Номер тайла не может превышать {max_num}')
             return
@@ -189,22 +143,66 @@ class OrderFormLand(StatesGroup):
         controller = get_controller(call)
         controller.form_land(land_type_str, user_data["tile_num"])
 
-        await call.message.delete()
-        message = await call.message.reply_photo(
+        await call.message.reply_photo(
             photo=convert_image(get_controller(call).world_manager.render_map()),
             caption='Ландшафт изменен',
             reply=False,
         )
         await call.answer()
-        call.message = message
-        await GodActionOrder().start_action_callback(call)
+        call.message.from_user = call.from_user
+        await render_god_info(call.message)
+        await call.message.delete()
 
 
-async def remove_all_god_action_states(call):
-    controller = get_controller(call)
-    for god_id in controller.world.gods:
-        if god_id == call.from_user.id:
-            continue
-        state = await Dispatcher.get_current().current_state(user=god_id).get_state()
-        if state in [GodActionOrder.start.state, GodActionOrder.act.state]:
-            await Dispatcher.get_current().current_state(user=god_id).set_state()
+async def render_god_info(message: types.Message):
+    controller = get_controller(message)
+    keyboard = None
+    if controller.is_allowed_to_act:
+        if not controller.collect_allowed_actions():
+            await _end_round_answer(message)
+            return
+        else:
+            await remove_buttons_from_current_message_with_buttons(message, controller)
+
+            buttons = [
+                types.InlineKeyboardButton(text="Потратить силу", callback_data=CB_SPEND_FORCE),
+                types.InlineKeyboardButton(text="Завершить ход", callback_data=CB_END_ACTION),
+                types.InlineKeyboardButton(text="Завершить раунд", callback_data=CB_END_ROUND),
+            ]
+            keyboard = types.InlineKeyboardMarkup(row_width=1)
+            if controller.is_allowed_to_end_era:
+                buttons.append(types.InlineKeyboardButton(text="Завершить эпоху", callback_data=CB_END_ERA))
+            keyboard.add(*buttons)
+            await GodActionOrder.act.set()
+
+    message_text = controller.current_god.info
+    if not controller.world.is_start_game:
+        message_text += '\n Действия будут доступны после того как администратор начнет игру'
+
+    answer = await message.answer(
+        message_text,
+        reply_markup=keyboard
+    )
+    controller.set_current_message_id(answer.message_id)
+
+
+async def _end_round_answer(call_or_message: Union[types.Message, types.CallbackQuery]):
+    controller = get_controller(call_or_message)
+    n_round = controller.world.n_round
+    n_era = controller.world.n_era
+    controller.next_redactor_god()
+    controller.end_round()
+
+    message = call_or_message if isinstance(call_or_message, types.Message) else call_or_message.message
+
+    state = Dispatcher.get_current().current_state()
+    await state.finish()
+    if controller.world_manager.is_creation_end:
+        await message.answer('Мир создан')
+    elif n_round < controller.world.n_round:
+        await message.answer('Начался новый раунд, боги получили силу, мир стал старше')
+    elif n_era < controller.world.n_era:
+        await message.answer('Началась новая эпоха, время теперь течет быстрее')
+    if isinstance(call_or_message, types.CallbackQuery):
+        await call_or_message.message.edit_reply_markup(None)
+        await call_or_message.answer()

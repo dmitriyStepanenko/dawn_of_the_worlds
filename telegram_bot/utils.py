@@ -1,13 +1,12 @@
 from typing import Union
-from pathlib import Path
 import io
 
 from PIL import Image
 
 from aiogram import types, Dispatcher
+from aiogram.utils.exceptions import MessageToEditNotFound, MessageNotModified
 
 from world_creator.controller import Controller
-from world_creator.model import World
 
 
 def convert_image(image: Image) -> types.InputFile:
@@ -19,16 +18,6 @@ def convert_image(image: Image) -> types.InputFile:
 
 def get_chat_id(message_or_call: Union[types.CallbackQuery, types.Message]):
     return get_chat(message_or_call).id
-
-
-def get_user_id(message_or_call: Union[types.CallbackQuery, types.Message]):
-    # todo
-    if isinstance(message_or_call, types.Message):
-        return message_or_call.from_user.id
-    elif isinstance(message_or_call, types.CallbackQuery):
-        return message_or_call.from_user.id
-    else:
-        raise NotImplementedError
 
 
 def get_chat(message_or_call: Union[types.CallbackQuery, types.Message]):
@@ -63,11 +52,16 @@ async def is_user_admin(message_or_call: Union[types.Message, types.CallbackQuer
 
 
 def get_controller(message_or_call: Union[types.CallbackQuery, types.Message]) -> Controller:
-    return Controller(get_chat_id(message_or_call), get_user_id(message_or_call))
+    return Controller(get_chat_id(message_or_call), message_or_call.from_user.id)
 
 
-def get_god_name_from_message(message: types.Message):
+async def remove_buttons_from_current_message_with_buttons(message, controller):
     try:
-        return message.text.split('\n')[0].split(' ')[1]
-    except Exception:
-        return None
+        if controller.world.current_message_with_buttons_id is not None:
+            await message.bot.edit_message_reply_markup(
+                message.chat.id,
+                controller.world.current_message_with_buttons_id,
+                reply_markup=None
+            )
+    except (MessageToEditNotFound, MessageNotModified):
+        pass

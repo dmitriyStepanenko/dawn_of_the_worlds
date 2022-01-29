@@ -20,11 +20,13 @@ CB_RENDER_WORLD_MAP = 'render_world_map'
 CB_CREATE_WORLD = 'create_world'
 CB_DELETE_WORLD = 'delete_world'
 CB_FILL_LANDS = 'fill_lands_'
+CB_START_GAME = 'start_game'
 
 
 def register_handlers_world_creation(db: Dispatcher):
     db.register_message_handler(cmd_get_world, commands=[CMD_WORLD_INFO], state='*')
 
+    db.register_callback_query_handler(start_game_callback, text=CB_START_GAME, state='*')
     db.register_callback_query_handler(render_world_map_callback, text=CB_RENDER_WORLD_MAP, state='*')
 
     WorldDeletionOrder().register(db)
@@ -120,6 +122,8 @@ class WorldRenderOrder(StatesGroup):
             admin_buttons = [
                 types.InlineKeyboardButton(text="Удалить мир", callback_data=CB_DELETE_WORLD)
             ]
+            if not get_controller(message_or_call).world.is_start_game:
+                admin_buttons.append(types.InlineKeyboardButton(text="Начать игру", callback_data=CB_START_GAME))
             keyboard.add(*admin_buttons)
         return keyboard
 
@@ -183,6 +187,11 @@ class WorldDeletionOrder(StatesGroup):
         dispatcher.register_message_handler(self.world_deleted, state=self.clear)
 
     async def clear_world_callback(self, call: types.CallbackQuery):
+        is_admin = await is_user_admin(call)
+        if not is_admin:
+            await call.answer('Эта кнопка для администратора')
+            return
+
         controller = get_controller(call)
         if not controller.is_world_created:
             await create_world(call.message)
@@ -222,3 +231,12 @@ async def render_world_map_callback(call: types.CallbackQuery):
         await create_world(call.message)
 
     await call.answer()
+
+
+async def start_game_callback(call: types.CallbackQuery):
+    is_admin = await is_user_admin(call)
+    if is_admin:
+        get_controller(call).start_game()
+        await call.answer()
+    else:
+        await call.answer('Эта кнопка для администратора')

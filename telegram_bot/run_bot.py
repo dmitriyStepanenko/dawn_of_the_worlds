@@ -1,4 +1,6 @@
 import asyncio
+from os import getenv
+
 from aiogram import Bot, Dispatcher, types, executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.types import BotCommand
@@ -8,8 +10,10 @@ from telegram_bot.handlers.god_actions import register_handlers_god_actions
 from telegram_bot.handlers.world import register_handlers_world_creation, CMD_WORLD_INFO
 from telegram_bot.handlers.common import register_handlers_common, register_last_handlers, CMD_CANCEL
 
-# todo: remove token
-BOT_TOKEN = ""
+
+BOT_TOKEN = getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    exit("Error: no token provided")
 
 
 # Регистрация команд, отображаемых в интерфейсе Telegram
@@ -39,5 +43,4 @@ async def main():
 
 
 if __name__ == '__main__':
-    # todo асинхронные сохранения файлов
     asyncio.run(main())
