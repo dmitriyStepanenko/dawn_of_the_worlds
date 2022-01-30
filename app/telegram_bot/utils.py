@@ -6,7 +6,7 @@ from PIL import Image
 from aiogram import types, Dispatcher
 from aiogram.utils.exceptions import MessageToEditNotFound, MessageNotModified
 
-from world_creator.controller import Controller
+from app.world_creator.controller import Controller
 
 
 def convert_image(image: Image) -> types.InputFile:
@@ -14,6 +14,13 @@ def convert_image(image: Image) -> types.InputFile:
     image.save(image_bytes, format='PNG')
     image_bytes.seek(0)
     return types.InputFile(image_bytes)
+
+
+def convert_text(text: str) -> types.InputFile:
+    text_bytes = io.BytesIO()
+    text_bytes.write(text.encode('utf-8'))
+    text_bytes.seek(0)
+    return types.InputFile(text_bytes)
 
 
 def get_chat_id(message_or_call: Union[types.CallbackQuery, types.Message]):

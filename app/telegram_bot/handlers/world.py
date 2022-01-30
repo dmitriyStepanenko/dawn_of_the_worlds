@@ -6,10 +6,10 @@ from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram import types, Dispatcher
 
 
-from telegram_bot.utils import convert_image, get_controller, is_user_admin, is_admin_state
-from telegram_bot.keyboards import get_one_button_keyboard
-from world_creator.controller import Controller
-from world_creator.model import MAX_SIZE_LAYER
+from app.telegram_bot.utils import convert_image, get_controller, is_user_admin, is_admin_state, convert_text
+from app.telegram_bot.keyboards import get_one_button_keyboard
+from app.world_creator.controller import Controller
+from app.world_creator.model import MAX_SIZE_LAYER
 
 
 MAX_WORLD_NAME_LEN = 30
@@ -17,20 +17,22 @@ MAX_WORLD_NAME_LEN = 30
 CMD_WORLD_INFO = 'world_info'
 
 CB_RENDER_WORLD_MAP = 'render_world_map'
+CB_RENDER_WORLD_STORY = 'render_world_story'
 CB_CREATE_WORLD = 'create_world'
 CB_DELETE_WORLD = 'delete_world'
 CB_FILL_LANDS = 'fill_lands_'
 CB_START_GAME = 'start_game'
 
 
-def register_handlers_world_creation(db: Dispatcher):
-    db.register_message_handler(cmd_get_world, commands=[CMD_WORLD_INFO], state='*')
+def register_handlers_world_creation(dispatcher: Dispatcher):
+    dispatcher.register_message_handler(cmd_get_world, commands=[CMD_WORLD_INFO], state='*')
 
-    db.register_callback_query_handler(start_game_callback, text=CB_START_GAME, state='*')
-    db.register_callback_query_handler(render_world_map_callback, text=CB_RENDER_WORLD_MAP, state='*')
+    dispatcher.register_callback_query_handler(start_game_callback, text=CB_START_GAME, state='*')
+    dispatcher.register_callback_query_handler(render_world_map_callback, text=CB_RENDER_WORLD_MAP, state='*')
+    dispatcher.register_callback_query_handler(render_world_story_callback, text=CB_RENDER_WORLD_STORY, state='*')
 
-    WorldDeletionOrder().register(db)
-    WorldCreationOrder().register(db)
+    WorldDeletionOrder().register(dispatcher)
+    WorldCreationOrder().register(dispatcher)
 
 
 class WorldCreationOrder(StatesGroup):
@@ -114,6 +116,7 @@ class WorldRenderOrder(StatesGroup):
     async def get_render_world_keyboard(message_or_call: Union[types.Message, types.CallbackQuery]):
         buttons = [
             types.InlineKeyboardButton(text="Показать карту", callback_data=CB_RENDER_WORLD_MAP),
+            types.InlineKeyboardButton(text="Показать историю мира", callback_data=CB_RENDER_WORLD_STORY)
         ]
         keyboard = types.InlineKeyboardMarkup(row_width=1)
         keyboard.add(*buttons)
@@ -134,19 +137,13 @@ class WorldRenderOrder(StatesGroup):
     ):
         keyboard = await self.get_render_world_keyboard(message_or_call)
         await self.render.set()
-        if isinstance(message_or_call, types.Message):
-            await message_or_call.answer(
-                controller.world.info,
-                reply_markup=keyboard
-            )
-        elif isinstance(message_or_call, types.CallbackQuery):
-            await message_or_call.message.answer(
-                controller.world.info,
-                reply_markup=keyboard
-            )
+        message = message_or_call if isinstance(message_or_call, types.Message) else message_or_call.message
+        await message.answer(
+            controller.world.info,
+            reply_markup=keyboard
+        )
+        if isinstance(message_or_call, types.CallbackQuery):
             await message_or_call.answer()
-        else:
-            raise NotImplementedError
 
 
 async def create_world(message: types.Message):
@@ -233,10 +230,30 @@ async def render_world_map_callback(call: types.CallbackQuery):
     await call.answer()
 
 
+async def render_world_story_callback(call: types.CallbackQuery):
+    controller = get_controller(call)
+    if controller.is_world_created:
+        story = controller.world_manager.render_story()
+        document = convert_text(story)
+        document.filename = f'История мира {controller.world.name}.txt'
+        await call.message.delete()
+        await call.message.reply_document(
+            document,
+            caption=call.message.text,
+            reply=False,
+            reply_markup=await WorldRenderOrder().get_render_world_keyboard(call)
+        )
+    else:
+        await create_world(call.message)
+
+    await call.answer()
+
+
 async def start_game_callback(call: types.CallbackQuery):
     is_admin = await is_user_admin(call)
     if is_admin:
         get_controller(call).start_game()
+        await call.message.edit_reply_markup(None)
         await call.answer()
     else:
         await call.answer('Эта кнопка для администратора')

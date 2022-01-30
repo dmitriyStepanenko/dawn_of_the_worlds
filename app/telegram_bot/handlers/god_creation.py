@@ -3,10 +3,10 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram import types, Dispatcher
 
-from telegram_bot.utils import get_controller
-from telegram_bot.keyboards import get_one_button_keyboard
-from telegram_bot.handlers.world import create_world
-from telegram_bot.handlers.god_actions import render_god_info
+from app.telegram_bot.utils import get_controller
+from app.telegram_bot.keyboards import get_one_button_keyboard
+from app.telegram_bot.handlers.world import create_world
+from app.telegram_bot.handlers.god_actions import render_god_info
 
 
 MAX_GOD_NAME_LEN = 30

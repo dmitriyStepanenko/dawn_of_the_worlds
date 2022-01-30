@@ -30,7 +30,7 @@ class ImageCollection:
 
 class ImageManager:
     def __init__(self):
-        self.image_dir = Path(__file__).parent / 'tile_pics'
+        self.image_dir = Path(__file__).parent.parent / 'data' / 'static' / 'tile_pics'
 
     @staticmethod
     def paste_scaled_image_with_alpha(base_image: Image, add_image: Image):
@@ -54,11 +54,11 @@ class ImageManager:
 
     def load_climate_tiles(self):
         images = {
-            ClimateType.CLOUD: Image.open(self.image_dir / 'cloud.png'),
-            ClimateType.RAIN: Image.open(self.image_dir / 'rain.png'),
-            ClimateType.SNOW: Image.open(self.image_dir / 'snow.png')
+            ClimateType.CLOUD.value: Image.open(self.image_dir / 'cloud.png'),
+            ClimateType.RAIN.value: Image.open(self.image_dir / 'rain.png'),
+            ClimateType.SNOW.value: Image.open(self.image_dir / 'snow.png')
         }
-        return ImageCollection(images=images, image_size=images[ClimateType.CLOUD].size)
+        return ImageCollection(images=images, image_size=images[ClimateType.CLOUD.value].size)
 
     @staticmethod
     def draw_grid(size: tuple[int, int], shape: tuple[int, int]) -> Image:

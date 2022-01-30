@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from world_creator.model import World
+from app.world_creator.model import World
 
-STORAGE_DIR = Path(__file__).parent / 'data'
+STORAGE_DIR = Path(__file__).parent.parent / 'data' / 'worlds'
 
 
 class Storage:

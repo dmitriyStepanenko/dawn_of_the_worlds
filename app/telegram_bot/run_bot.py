@@ -1,17 +1,17 @@
 import asyncio
-from os import getenv
+import os
 
 from aiogram import Bot, Dispatcher, types, executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.types import BotCommand
 
-from telegram_bot.handlers.god_creation import register_handlers_god_creation, CMD_GOD_INFO
-from telegram_bot.handlers.god_actions import register_handlers_god_actions
-from telegram_bot.handlers.world import register_handlers_world_creation, CMD_WORLD_INFO
-from telegram_bot.handlers.common import register_handlers_common, register_last_handlers, CMD_CANCEL
+from app.telegram_bot.handlers.god_creation import register_handlers_god_creation, CMD_GOD_INFO
+from app.telegram_bot.handlers.god_actions import register_handlers_god_actions
+from app.telegram_bot.handlers.world import register_handlers_world_creation, CMD_WORLD_INFO
+from app.telegram_bot.handlers.common import register_handlers_common, register_last_handlers, CMD_CANCEL
 
 
-BOT_TOKEN = getenv("BOT_TOKEN")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
     exit("Error: no token provided")
 

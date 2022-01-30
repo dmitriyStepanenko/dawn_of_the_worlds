@@ -1,7 +1,7 @@
-from .model import Actions, GodProfile, Race, Avatar, World
-from .tiles import InitPositionRaceTile, Tile, TerrainTile, LandType
+from .model import Actions, GodProfile, Race, Avatar, World, LayerName
+from .tiles import InitPositionRaceTile, Tile, LandType, ClimateType
 from .world_manager import WorldManager
-from storage.storage import Storage
+from app.storage.storage import Storage
 
 
 class Controller:
@@ -32,7 +32,8 @@ class Controller:
     def create_world(self, name: str, layers_shape: tuple[int, int], percent: int):
         world = World(name=name, layers_shape=layers_shape)
         self.world_manager = WorldManager(world)
-        self.world_manager.create_base_lands_layer(percent)
+        self.world_manager.add_init_layers()
+        self.world_manager.fill_base_lands_layer(percent)
         self.save()
 
     def remove_world(self):
@@ -108,41 +109,28 @@ class Controller:
         return []
 
     def form_land(self, tile_type: str, tile_num: int):
-        # todo move constant
-        layer_name = 'lands'
-
-        land_types = {
-            LandType.WATER.value: LandType.WATER,
-            LandType.FOREST.value: LandType.FOREST,
-            LandType.SAND.value: LandType.SAND,
-            LandType.ROCK.value: LandType.ROCK,
-            LandType.PLATEAU.value: LandType.PLATEAU,
-        }
-        tile = TerrainTile(position=tile_num, type_land=land_types[tile_type])
+        tile = Tile(position=tile_num, image_ref=tile_type)
 
         force_value = self.world_manager.calc_action_cost(Actions.CREATE_LAND)
         tile.creator = self.current_god.name
-        self.world_manager.change_tile(layer_name, tile)
+        self.world_manager.change_tile(LayerName.LANDS, tile)
 
         self.world_manager.spend_force(god_id=self._god_id, value=force_value)
         self.world_manager.log(f'{self.current_god} изменил ландшафт в координатах {tile.position} на {tile}')
         self.save()
 
-    #
-    # def form_climate(self, god: GodProfile, tile: Tile):
-    #     layer_name = 'climate'
-    #     cost_coefficient = self.world_manager.calc_action_cost_coefficient(layer_name, tile, god)
-    #     force_value = self.world_manager.calc_action_cost(Actions.CREATE_CLIMATE) * cost_coefficient
-    #     god.check_force_enough(force_value)
-    #     tile.creator = god.name
-    #     self.world_manager.change_tile(layer_name, tile)
-    #
-    #     god.spend_force(force_value)
-    #     if cost_coefficient == 1:
-    #         message = f'{god} создал климатическую зону {tile} в координатах {tile.position}'
-    #     else:
-    #         message = f'{god} изменил климатическую зону в координатах {tile.position} на {tile}'
-    #     self.world_manager.log(message)
+    def form_climate(self, tile_type: str, tile_num: int):
+        if tile_type == ClimateType.CLEAR.value:
+            tile_type = None
+        tile = Tile(position=tile_num, image_ref=tile_type)
+
+        force_value = self.world_manager.calc_action_cost(Actions.CREATE_CLIMATE)
+        tile.creator = self.current_god.name
+        self.world_manager.change_tile(LayerName.CLIMATE, tile)
+
+        self.world_manager.spend_force(god_id=self._god_id, value=force_value)
+        self.world_manager.log(f'{self.current_god} изменил климат в координатах {tile.position} на {tile}')
+        self.save()
     #
     # def create_race(self, god: GodProfile, race: Race):
     #     if self.world_manager.is_exist_race(race.name):

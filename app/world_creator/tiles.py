@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Union
+from typing import Any, Union, Optional
 
 from .base_model import BaseModel
 from pydantic import Field
@@ -7,7 +7,7 @@ from pydantic import Field
 
 class Tile(BaseModel):
     position: int = Field(...)
-    image_ref: str = Field(None)
+    image_ref: Optional[str] = Field(None)
     creator: str = Field(None)
     name: str = Field(None)
 
@@ -28,21 +28,10 @@ class LandType(Enum):
     ROCK = 'ROCK'
 
 
-class TerrainTile(Tile):
-    type_land: LandType = Field(...)
-
-    def __init__(self, **data: Any):
-        super().__init__(**data)
-        self.image_ref = self.type_land.value
-
-    def __str__(self):
-        return self.type_land.value
-
-
 class ClimateType(Enum):
     CLOUD = 'CLOUD'
     SNOW = 'SNOW'
-    FOG = 'FOG'
+    # FOG = 'FOG'
     RAIN = 'RAIN'
     CLEAR = 'CLEAR'
 
@@ -55,6 +44,5 @@ class InitPositionRaceTile(Tile):
 
 TILES = Union[
     Tile,
-    TerrainTile,
     InitPositionRaceTile,
 ]

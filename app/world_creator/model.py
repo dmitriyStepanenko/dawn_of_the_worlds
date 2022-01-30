@@ -1,3 +1,4 @@
+import enum
 from enum import Enum
 
 from typing import Any, Optional
@@ -19,7 +20,7 @@ class Action(BaseModel):
 
 class Actions(Enum):
     CREATE_LAND = Action(name='CREATE_LAND', costs=[3, 5, 8])
-    # CREATE_CLIMATE = Action(name='CREATE_CLIMATE', costs=[2, 4, 6])
+    CREATE_CLIMATE = Action(name='CREATE_CLIMATE', costs=[2, 4, 6])
     CREATE_RACE = Action(name='CREATE_RACE', costs=[22, 6, 15])
     CREATE_SUBRACE = Action(name='CREATE_SUBRACE', costs=[12, 4, 10])
     CONTROL_RACE = Action(name='CONTROL_RACE', costs=[8, 4, 3])
@@ -84,17 +85,6 @@ class Race(BaseModel):
     technologies: list[str] = Field([])
 
 
-class City(BaseModel):
-    def __init__(self, name, init_fraction, base_race: Race, **data: Any):
-        super().__init__(**data)
-        self.name = name
-        self.fractions = [init_fraction]
-        self.avatars = []
-
-        self.alignment = base_race.alignment
-        self.technologies: list[str] = []
-
-
 class Layer(BaseModel):
     layer_name: str = Field(...)
     shape: tuple[int, int] = Field(...)
@@ -113,6 +103,11 @@ class Layer(BaseModel):
         return out_str
 
 
+class LayerName(Enum):
+    LANDS = 'lands'
+    CLIMATE = 'climate'
+
+
 class World(BaseModel):
     name: str = Field(...)
     layers: dict[str, Layer] = Field({})
@@ -121,7 +116,6 @@ class World(BaseModel):
 
     gods: dict[int, GodProfile] = Field({}, description='Профайлы богов по id их владельцев')
     races: dict[str, Race] = Field({})
-    cities: dict[str, City] = Field({})
 
     redactor_god_id: Optional[int] = Field(None, description='id бога которому разрешено сейчас действовать')
     current_message_with_buttons_id: Optional[int] = Field(None)
