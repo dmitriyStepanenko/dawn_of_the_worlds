@@ -216,7 +216,7 @@ class WorldDeletionOrder(StatesGroup):
 async def render_world_map_callback(call: types.CallbackQuery):
     controller = get_controller(call)
     if controller.is_world_created:
-        image = controller.world_manager.render_map()
+        image = controller.render_map()
         await call.message.delete()
         await call.message.reply_photo(
             convert_image(image),

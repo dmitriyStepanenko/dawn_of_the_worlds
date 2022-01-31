@@ -1,5 +1,6 @@
 from copy import deepcopy
 from random import randint, choice
+from typing import Optional
 
 from PIL import Image
 
@@ -10,6 +11,8 @@ from .tiles import Tile, EmptyTile
 from .tiles import LandType
 from .model import GodProfile
 from .model import Race
+
+LAYER_SHAPE_SCALE_COEFFICIENT = 3
 
 
 class WorldManager:
@@ -91,6 +94,13 @@ class WorldManager:
         """
         self.create_layer(LayerName.LANDS)
         self.create_layer(LayerName.CLIMATE)
+        self.create_layer(
+            layer_name=LayerName.RACE,
+            shape=(
+                self.world.layers_shape[0] * LAYER_SHAPE_SCALE_COEFFICIENT,
+                self.world.layers_shape[1] * LAYER_SHAPE_SCALE_COEFFICIENT
+            )
+        )
 
     def fill_base_lands_layer(self, percent_of_plateau: int = 40):
         """
@@ -121,22 +131,6 @@ class WorldManager:
     def log(self, message: str):
         self.world.change_log.append(message)
 
-    def render_layer(
-            self,
-            layer_name: LayerName,
-            image_collection: ImageCollection,
-            add_grid: bool = False,
-            image_manager: ImageManager = ImageManager(),
-    ):
-        layer = self.get_layer(layer_name)
-        layer_image = image_manager.render_layer(layer, image_collection)
-
-        if add_grid:
-            grid_image = image_manager.draw_grid(layer_image.size, layer.shape)
-            image_manager.paste_scaled_image_with_alpha(layer_image, grid_image)
-
-        return layer_image
-
     def fill_layer(self, layer_name: LayerName, filling_tile: Tile):
         layer = self.get_layer(layer_name)
         layer.tiles = []
@@ -157,14 +151,30 @@ class WorldManager:
             filling_tile.position = pos
             layer.tiles[pos] = deepcopy(filling_tile)
 
-    def render_map(self, image_manager: ImageManager = ImageManager(),) -> Image:
-        world_map_image = self.render_layer(LayerName.LANDS, image_manager.load_land_tiles(), add_grid=True)
+    def render_map(
+            self,
+            add_grid_for_layer: Optional[LayerName] = None
+    ) -> Image:
+        image_manager = ImageManager()
 
-        # race_layer_image = self.render_layer('races', image_manager.load_race_init_tiles())
-        # image_manager.paste_scaled_image_with_alpha(world_map_image, race_layer_image)
-        #
-        climate_layer_image = self.render_layer(LayerName.CLIMATE, image_manager.load_climate_tiles())
-        image_manager.paste_scaled_image_with_alpha(world_map_image, climate_layer_image)
+        world_map_image = None
+        image_collection_loaders = [
+            image_manager.load_land_tiles,
+            image_manager.load_climate_tiles,
+            image_manager.load_race_init_tiles
+        ]
+        for layer_name, image_collection_loader in zip(LayerName, image_collection_loaders):
+            layer = self.get_layer(layer_name)
+            layer_image = image_manager.render_layer(layer, image_collection_loader())
+            if world_map_image:
+                image_manager.paste_scaled_image_with_alpha(world_map_image, layer_image)
+            else:
+                world_map_image = layer_image
+
+        if add_grid_for_layer:
+            gird_layer = self.get_layer(add_grid_for_layer)
+            grid_image = image_manager.draw_grid(world_map_image.size, gird_layer.shape)
+            image_manager.paste_scaled_image_with_alpha(world_map_image, grid_image)
 
         return world_map_image
 

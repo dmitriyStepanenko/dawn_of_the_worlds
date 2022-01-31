@@ -76,12 +76,12 @@ class RaceFraction(BaseModel):
 class Race(BaseModel):
     name: str = Field(...)
     description: str = Field(...)
-    init_position: tuple[int, int] = Field(...)
+    init_position: int = Field(...)
     avatars: dict[str, Avatar] = Field({})
-    god_creator: GodProfile = Field(...)
+    god_creator: str = Field(...)
     fractions: dict[str, RaceFraction] = Field({})
     alignment: int = Field(0)
-    parent_name: str = Field(None)
+    parent_name: Optional[str] = Field(None)
     technologies: list[str] = Field([])
 
 
@@ -106,6 +106,7 @@ class Layer(BaseModel):
 class LayerName(Enum):
     LANDS = 'lands'
     CLIMATE = 'climate'
+    RACE = 'race'
 
 
 class World(BaseModel):

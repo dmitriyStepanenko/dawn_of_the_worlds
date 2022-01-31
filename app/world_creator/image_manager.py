@@ -64,12 +64,12 @@ class ImageManager:
     def draw_grid(size: tuple[int, int], shape: tuple[int, int]) -> Image:
         image = Image.new('RGBA', size)
         draw = ImageDraw.Draw(image)
-        x_coeff = size[0] / shape[0]
-        y_coeff = size[1] / shape[1]
+        y_coeff = size[0] / shape[0]
+        x_coeff = size[1] / shape[1]
         for x in range(shape[0]):
             for y in range(shape[1]):
                 draw.line(((x * x_coeff, 0), (x * x_coeff, size[1])), fill='black', width=2)
-                draw.line(((0, y * y_coeff), (size[1], y * y_coeff)), fill='black', width=2)
+                draw.line(((0, y * y_coeff), (size[0], y * y_coeff)), fill='black', width=2)
 
                 text = f'{x + shape[0] * y}'
                 text_width, text_height = draw.textsize(text)

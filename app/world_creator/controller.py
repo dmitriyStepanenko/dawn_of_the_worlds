@@ -54,6 +54,9 @@ class Controller:
         self.save()
         return god
 
+    def spend_force(self, value: int):
+        self.world_manager.spend_force(god_id=self._god_id, value=value)
+
     def next_redactor_god(self):
         god_ids = [god_id for god_id, god in self.world.gods.items() if not god.confirm_end_round]
         index = god_ids.index(self._god_id)
@@ -108,6 +111,10 @@ class Controller:
             ]
         return []
 
+    def render_map(self, layer_name: str = None):
+        layer_names = {l_name.value: l_name for l_name in LayerName}
+        return self.world_manager.render_map(layer_names.get(layer_name))
+
     def form_land(self, tile_type: str, tile_num: int):
         tile = Tile(position=tile_num, image_ref=tile_type)
 
@@ -115,7 +122,7 @@ class Controller:
         tile.creator = self.current_god.name
         self.world_manager.change_tile(LayerName.LANDS, tile)
 
-        self.world_manager.spend_force(god_id=self._god_id, value=force_value)
+        self.spend_force(value=force_value)
         self.world_manager.log(f'{self.current_god} изменил ландшафт в координатах {tile.position} на {tile}')
         self.save()
 
@@ -128,23 +135,29 @@ class Controller:
         tile.creator = self.current_god.name
         self.world_manager.change_tile(LayerName.CLIMATE, tile)
 
-        self.world_manager.spend_force(god_id=self._god_id, value=force_value)
+        self.spend_force(value=force_value)
         self.world_manager.log(f'{self.current_god} изменил климат в координатах {tile.position} на {tile}')
         self.save()
-    #
-    # def create_race(self, god: GodProfile, race: Race):
-    #     if self.world_manager.is_exist_race(race.name):
-    #         raise ValueError(f'Раса {race.name} уже существует')
-    #
-    #     force_value = self.world_manager.calc_action_cost(Actions.CREATE_RACE)
-    #     god.check_force_enough(force_value)
-    #     self.world_manager.world.races[race.name] = race
-    #
-    #     layer = self.world_manager.get_layer('races')
-    #     layer.replace_tile(InitPositionRaceTile(*race.init_position))
-    #     god.spend_force(force_value)
-    #     self.world_manager.log(f'{god} создал расу {race.name} с начальной позицией {race.init_position}')
-    #
+
+    def is_race_exist(self, race_name: str):
+        self.world_manager.is_exist_race(race_name)
+
+    def create_race(self, name: str, description: str, init_position: int, alignment: int):
+        race = Race(
+            name=name,
+            description=description,
+            init_position=init_position,
+            god_creator=self.current_god.name,
+            alignment=alignment
+        )
+        force_value = self.world_manager.calc_action_cost(Actions.CREATE_RACE)
+        self.world_manager.world.races[race.name] = race
+
+        self.world_manager.change_tile(LayerName.RACE, InitPositionRaceTile(position=race.init_position))
+        self.spend_force(force_value)
+        self.world_manager.log(f'{self.current_god} создал расу {race.name} с начальной позицией {race.init_position}')
+        self.save()
+
     # def create_subrace(self, god: GodProfile, race: Race):
     #     if self.world_manager.is_exist_race(race.name):
     #         raise ValueError(f'Раса {race.name} уже существует')
