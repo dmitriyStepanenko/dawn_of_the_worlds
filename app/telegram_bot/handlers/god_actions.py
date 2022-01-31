@@ -6,7 +6,6 @@ from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.types import InlineKeyboardButton as Button
 
-from app.telegram_bot.keyboards import get_one_button_keyboard
 from app.telegram_bot.utils import get_controller, convert_image, remove_buttons_from_current_message_with_buttons
 from app.world_creator.controller import Controller
 
@@ -25,6 +24,8 @@ CB_CREATE_RACE = 'create_race'
 CB_CREATE_SUBRACE = 'create_subrace'
 CB_SET_START_ALIGNMENT = 'set_start_alignment'
 
+CB_CHANGE_RACE_ALIGNMENT = 'change_race_alignment'
+
 
 MAX_RACE_NAME_LEN = 30
 MAX_RACE_DESCRIPTION_LEN = 500
@@ -38,6 +39,8 @@ def register_handlers_god_actions(dispatcher: Dispatcher):
     register_order_form_climate(dispatcher)
 
     RaceCreationOrder().register(dispatcher)
+
+    ChangeRaceAlignmentOrder().register(dispatcher)
 
 
 def register_order_form_land(dispatcher: Dispatcher):
@@ -119,10 +122,18 @@ class GodActionOrder(StatesGroup):
     async def spend_force_callback(call: types.CallbackQuery):
         controller = get_controller(call)
         allowed_actions = controller.collect_allowed_actions()
+        n_era = controller.world.n_era
+
+        action_text_cb = [
+            (Actions.CREATE_LAND, 'Формировать землю', CB_FORM_LAND),
+            (Actions.CREATE_CLIMATE, 'Формировать климат', CB_FORM_CLIMATE),
+            (Actions.CREATE_RACE, 'Создать расу', CB_CREATE_RACE),
+            (Actions.INCREASE_REALM_ALIGNMENT, 'Очистить расу', CB_CHANGE_RACE_ALIGNMENT+'_+'),
+            (Actions.DECREASE_REALM_ALIGNMENT, 'Совратить расу', CB_CHANGE_RACE_ALIGNMENT + '_-'),
+        ]
         buttons_by_actions = {
-            Actions.CREATE_LAND.name: Button(text="Формировать землю", callback_data=CB_FORM_LAND),
-            Actions.CREATE_CLIMATE.name: Button(text="Формировать климат", callback_data=CB_FORM_CLIMATE),
-            Actions.CREATE_RACE.name: Button(text="Создать расу", callback_data=CB_CREATE_RACE)
+            action.name: Button(text=f"{text} ({action.value.costs[n_era]} БС)", callback_data=cb)
+            for action, text, cb in action_text_cb
         }
 
         buttons = []
@@ -304,6 +315,42 @@ class RaceCreationOrder(StatesGroup):
             init_position=user_data['init_position'],
             alignment=alignment_by_sign[sign],
         )
+        await _finalize_god_action(call, state)
+
+
+class ChangeRaceAlignmentOrder(StatesGroup):
+    race = State()
+
+    def register(self, dispatcher: Dispatcher):
+        dispatcher.register_callback_query_handler(
+            self.choose_race, Text(startswith=CB_CHANGE_RACE_ALIGNMENT+'_'), state=GodActionOrder.act,
+        )
+        dispatcher.register_callback_query_handler(
+            self.change_race_alignment, Text(startswith=CB_CHANGE_RACE_ALIGNMENT+'_'), state=self.race,
+        )
+
+    async def choose_race(self, call: types.CallbackQuery, state: FSMContext):
+        sing = call.data.split('_')[-1]
+        await state.update_data(race_alignment={'+': 1, '-': -1}.get(sing))
+        controller = get_controller(call)
+        buttons = [
+            Button(text=f'{name} ({alignment})', callback_data=f'{CB_CHANGE_RACE_ALIGNMENT}_{name}')
+            for name, alignment in controller.get_race_names_and_alignments()
+        ]
+        keyboard = types.InlineKeyboardMarkup(row_width=1)
+        keyboard.add(*buttons)
+        await call.message.edit_text(
+            'Выберите расу',
+            reply_markup=keyboard
+        )
+        await self.race.set()
+
+    @staticmethod
+    async def change_race_alignment(call: types.CallbackQuery, state: FSMContext):
+        race_name = call.data.split('_')[-1]
+        user_data = await state.get_data()
+        controller = get_controller(call)
+        controller.change_race_alignment(race_name, user_data['race_alignment'])
         await _finalize_god_action(call, state)
 
 

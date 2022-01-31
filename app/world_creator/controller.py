@@ -158,6 +158,25 @@ class Controller:
         self.world_manager.log(f'{self.current_god} создал расу {race.name} с начальной позицией {race.init_position}')
         self.save()
 
+    def change_race_alignment(self, race_name: str, alignment: int):
+        if alignment == 1:
+            action = Actions.INCREASE_REALM_ALIGNMENT
+        elif alignment == -1:
+            action = Actions.DECREASE_REALM_ALIGNMENT
+        else:
+            raise NotImplementedError
+
+        force_value = self.world_manager.calc_action_cost(action)
+        race = self.world_manager.get_race(race_name)
+        race.alignment += alignment
+        self.spend_force(force_value)
+        text_interpretation = 'очистил' if alignment == 1 else 'совратил'
+        self.world_manager.log(f'{self.current_god} {text_interpretation} {race.name}')
+        self.save()
+
+    def get_race_names_and_alignments(self) -> list[tuple[str, int]]:
+        return [(r.name, r.alignment) for r in self.world.races.values()]
+
     # def create_subrace(self, god: GodProfile, race: Race):
     #     if self.world_manager.is_exist_race(race.name):
     #         raise ValueError(f'Раса {race.name} уже существует')
