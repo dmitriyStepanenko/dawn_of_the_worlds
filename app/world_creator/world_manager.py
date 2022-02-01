@@ -92,15 +92,14 @@ class WorldManager:
         Считаем, что изначально есть слои:
         Территория, Климат
         """
+        scaled_shape = (
+            self.world.layers_shape[0] * LAYER_SHAPE_SCALE_COEFFICIENT,
+            self.world.layers_shape[1] * LAYER_SHAPE_SCALE_COEFFICIENT
+        )
         self.create_layer(LayerName.LANDS)
         self.create_layer(LayerName.CLIMATE)
-        self.create_layer(
-            layer_name=LayerName.RACE,
-            shape=(
-                self.world.layers_shape[0] * LAYER_SHAPE_SCALE_COEFFICIENT,
-                self.world.layers_shape[1] * LAYER_SHAPE_SCALE_COEFFICIENT
-            )
-        )
+        self.create_layer(LayerName.RACE, shape=scaled_shape)
+        self.create_layer(LayerName.EVENT, shape=scaled_shape)
 
     def fill_base_lands_layer(self, percent_of_plateau: int = 40):
         """
@@ -161,7 +160,8 @@ class WorldManager:
         image_collection_loaders = [
             image_manager.load_land_tiles,
             image_manager.load_climate_tiles,
-            image_manager.load_race_init_tiles
+            image_manager.load_race_init_tiles,
+            image_manager.load_event_tiles,
         ]
         for layer_name, image_collection_loader in zip(LayerName, image_collection_loaders):
             layer = self.get_layer(layer_name)

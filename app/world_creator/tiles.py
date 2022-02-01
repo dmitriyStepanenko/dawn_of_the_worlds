@@ -42,7 +42,14 @@ class InitPositionRaceTile(Tile):
         self.image_ref = self.__class__.__name__
 
 
+class EventTile(Tile):
+    def __init__(self, **data: Any):
+        super().__init__(**data)
+        self.image_ref = self.__class__.__name__
+
+
 TILES = Union[
     Tile,
     InitPositionRaceTile,
+    EventTile,
 ]

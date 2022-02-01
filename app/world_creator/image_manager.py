@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw
 
 from .model import Layer
-from .tiles import LandType
+from .tiles import LandType, EventTile
 from .tiles import ClimateType
 from .tiles import InitPositionRaceTile
 from pathlib import Path
@@ -51,6 +51,10 @@ class ImageManager:
     def load_race_init_tiles(self):
         init_pos_image = Image.open(self.image_dir / 'race_init_tile.png')
         return ImageCollection({InitPositionRaceTile.__name__: init_pos_image}, image_size=init_pos_image.size)
+
+    def load_event_tiles(self):
+        tile = Image.open(self.image_dir / 'event_tile.png')
+        return ImageCollection({EventTile.__name__: tile}, image_size=tile.size)
 
     def load_climate_tiles(self):
         images = {

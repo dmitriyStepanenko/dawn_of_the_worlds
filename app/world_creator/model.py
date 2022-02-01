@@ -107,6 +107,7 @@ class LayerName(Enum):
     LANDS = 'lands'
     CLIMATE = 'climate'
     RACE = 'race'
+    EVENT = 'event'
 
 
 class World(BaseModel):
@@ -117,6 +118,7 @@ class World(BaseModel):
 
     gods: dict[int, GodProfile] = Field({}, description='Профайлы богов по id их владельцев')
     races: dict[str, Race] = Field({})
+    events: list[str] = Field([])
 
     redactor_god_id: Optional[int] = Field(None, description='id бога которому разрешено сейчас действовать')
     current_message_with_buttons_id: Optional[int] = Field(None)

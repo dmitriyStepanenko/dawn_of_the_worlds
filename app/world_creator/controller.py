@@ -1,5 +1,7 @@
+from typing import Optional
+
 from .model import Actions, GodProfile, Race, Avatar, World, LayerName
-from .tiles import InitPositionRaceTile, Tile, LandType, ClimateType
+from .tiles import InitPositionRaceTile, Tile, LandType, ClimateType, EventTile
 from .world_manager import WorldManager
 from app.storage.storage import Storage
 
@@ -177,24 +179,20 @@ class Controller:
     def get_race_names_and_alignments(self) -> list[tuple[str, int]]:
         return [(r.name, r.alignment) for r in self.world.races.values()]
 
-    # def create_subrace(self, god: GodProfile, race: Race):
-    #     if self.world_manager.is_exist_race(race.name):
-    #         raise ValueError(f'Раса {race.name} уже существует')
-    #
-    #     if not self.world_manager.is_exist_race(race.parent_name):
-    #         raise ValueError(f'У подрасы должна быть раса предок')
-    #
-    #     force_value = self.world_manager.calc_action_cost(Actions.CREATE_SUBRACE)
-    #     god.check_force_enough(force_value)
-    #     self.world_manager.world.races[race.name] = race
-    #
-    #     layer = self.world_manager.get_layer('races')
-    #     layer.replace_tile(InitPositionRaceTile(*race.init_position))
-    #     god.spend_force(force_value)
-    #     self.world_manager.log(
-    #         f'{god} создал подрасу {race.name} расы {race.parent_name} с начальной позицией {race.init_position}'
-    #     )
-    #
+    def create_event(self, description: str, position: Optional[int] = None):
+        add_message = ''
+        if position is not None:
+            self.world_manager.change_tile(LayerName.EVENT, EventTile(position=position))
+            add_message = f'в координатах {position}'
+        self.world.events.append(description)
+        force_value = self.world_manager.calc_action_cost(Actions.EVENT)
+        self.spend_force(force_value)
+        self.world_manager.log(f'{self.current_god} создал событие {description}' + add_message)
+        self.save()
+
+    def get_layer_num_tiles(self, layer_name: LayerName):
+        return self.world_manager.get_layer(layer_name).num_tiles
+
     # def control_race(self, god: GodProfile, race_name: str, race_action):
     #     race = self.world_manager.get_race(race_name)
     #
@@ -244,28 +242,6 @@ class Controller:
     #     god.spend_force(force_value)
     #     self.world_manager.log(f'{god} даровал городу знания: {technology}')
     #
-    # def change_alignment(self, god: GodProfile, obj, value: int, action: Actions):
-    #     if not hasattr(obj, 'alignment'):
-    #         raise ValueError(f'У объекта {obj} нет элаймента')
-    #
-    #     force_value = self.world_manager.calc_action_cost(action)
-    #     god.check_force_enough(force_value)
-    #
-    #     obj.alignment += value
-    #     god.spend_force(force_value)
-    #
-    # def increase_race_alignment(self, god: GodProfile, race_name: str):
-    #     race = self.world_manager.get_race(race_name)
-    #
-    #     self.change_alignment(god, race, 1, Actions.INCREASE_REALM_ALIGNMENT)
-    #     self.world_manager.log(f'{god.name} очистил расу {race_name}')
-    #
-    # def decrease_realm_alignment(self, god: GodProfile, race_name: str):
-    #     race = self.world_manager.get_race(race_name)
-    #
-    #     self.change_alignment(god, race, -1, Actions.INCREASE_REALM_ALIGNMENT)
-    #     self.world_manager.log(f'{god.name} совратил расу {race_name}')
-    #
     # def increase_city_alignment(self, god: GodProfile, city_name: str):
     #     city = self.world_manager.get_city(city_name)
     #
@@ -277,9 +253,6 @@ class Controller:
     #
     #     self.change_alignment(god, city, -1, Actions.INCREASE_CITY_ALIGNMENT)
     #     self.world_manager.log(f'{god} совратил город {city_name}')
-    #
-    # def make_event(self):
-    #     ...
     #
     # def create_order(self):
     #     ...

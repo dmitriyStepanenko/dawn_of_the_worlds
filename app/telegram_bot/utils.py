@@ -7,6 +7,7 @@ from aiogram import types, Dispatcher
 from aiogram.utils.exceptions import MessageToEditNotFound, MessageNotModified
 
 from app.world_creator.controller import Controller
+from app.world_creator.model import LayerName
 
 
 def convert_image(image: Image) -> types.InputFile:
@@ -72,3 +73,19 @@ async def remove_buttons_from_current_message_with_buttons(message, controller):
             )
     except (MessageToEditNotFound, MessageNotModified):
         pass
+
+
+async def is_position_incorrect(message: types.Message, layer_name: LayerName, controller: Controller = None):
+    if not message.text.isdigit():
+        await message.answer('Номер тайла должен быть число')
+        return True
+    tile_num = int(message.text)
+
+    if not controller:
+        controller = get_controller(message)
+    max_num = controller.get_layer_num_tiles(layer_name)
+    if max_num < tile_num < 0:
+        await message.answer(f'Номер тайла не может превышать {max_num}')
+        return True
+
+    return False

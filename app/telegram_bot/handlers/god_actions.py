@@ -6,7 +6,12 @@ from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.types import InlineKeyboardButton as Button
 
-from app.telegram_bot.utils import get_controller, convert_image, remove_buttons_from_current_message_with_buttons
+from app.telegram_bot.utils import (
+    get_controller,
+    convert_image,
+    remove_buttons_from_current_message_with_buttons,
+    is_position_incorrect
+)
 from app.world_creator.controller import Controller
 
 from app.world_creator.tiles import LandType
@@ -26,9 +31,12 @@ CB_SET_START_ALIGNMENT = 'set_start_alignment'
 
 CB_CHANGE_RACE_ALIGNMENT = 'change_race_alignment'
 
+CB_EVENT = 'event'
+CB_EVENT_POSITION = 'event_position'
 
 MAX_RACE_NAME_LEN = 30
 MAX_RACE_DESCRIPTION_LEN = 500
+MAX_EVENT_DESCRIPTION_LEN = 200
 
 
 def register_handlers_god_actions(dispatcher: Dispatcher):
@@ -41,6 +49,8 @@ def register_handlers_god_actions(dispatcher: Dispatcher):
     RaceCreationOrder().register(dispatcher)
 
     ChangeRaceAlignmentOrder().register(dispatcher)
+
+    EventCreationOrder().register(dispatcher)
 
 
 def register_order_form_land(dispatcher: Dispatcher):
@@ -130,6 +140,7 @@ class GodActionOrder(StatesGroup):
             (Actions.CREATE_RACE, 'Создать расу', CB_CREATE_RACE),
             (Actions.INCREASE_REALM_ALIGNMENT, 'Очистить расу', CB_CHANGE_RACE_ALIGNMENT+'_+'),
             (Actions.DECREASE_REALM_ALIGNMENT, 'Совратить расу', CB_CHANGE_RACE_ALIGNMENT + '_-'),
+            (Actions.EVENT, 'Событие', CB_EVENT),
         ]
         buttons_by_actions = {
             action.name: Button(text=f"{text} ({action.value.costs[n_era]} БС)", callback_data=cb)
@@ -193,15 +204,8 @@ class AddTileOrder(StatesGroup):
         await call.answer()
 
     async def choose_coord(self, message: types.Message, state: FSMContext):
-        if not message.text.isdigit():
-            await message.answer('Номер тайла должен быть число')
-            return
-        tile_num = int(message.text)
-
-        controller = get_controller(message)
-        max_num = controller.world.layers[self.LAYER_NAME].num_tiles
-        if max_num < tile_num < 0:
-            await message.answer(f'Номер тайла не может превышать {max_num}')
+        is_incorrect = await is_position_incorrect(message, self.LAYER_NAME)
+        if is_incorrect:
             return
 
         await state.update_data(tile_num=int(message.text))
@@ -278,13 +282,8 @@ class RaceCreationOrder(StatesGroup):
         await self.init_position.set()
 
     async def set_init_position(self, message: types.Message, state: FSMContext):
-        if not message.text.isdigit():
-            await message.answer('Номер тайла должен быть числом')
-            return
-        controller = get_controller(message)
-        num_tiles = controller.world.layers[LayerName.RACE.value].num_tiles
-        if num_tiles < int(message.text) < 0:
-            await message.answer(f'Номер тайла не должен превышать {num_tiles}')
+        is_incorrect = await is_position_incorrect(message, LayerName.RACE)
+        if is_incorrect:
             return
 
         buttons = [
@@ -354,6 +353,71 @@ class ChangeRaceAlignmentOrder(StatesGroup):
         await _finalize_god_action(call, state)
 
 
+class EventCreationOrder(StatesGroup):
+    description = State()
+    yes_no_position = State()
+    position = State()
+
+    def register(self, dispatcher: Dispatcher):
+        dispatcher.register_callback_query_handler(
+            self.start_callback, text=CB_EVENT, state=GodActionOrder.act,
+        )
+        dispatcher.register_message_handler(
+            self.set_description, state=self.description,
+        )
+        dispatcher.register_callback_query_handler(
+            self.ask_position, Text(startswith=CB_EVENT_POSITION+'_'), state=self.yes_no_position,
+        )
+        dispatcher.register_message_handler(
+            self.set_position, state=self.position
+        )
+
+    async def start_callback(self, call: types.CallbackQuery):
+        await call.message.edit_text("Введите описание события", reply_markup=None)
+        await call.answer()
+        await self.description.set()
+
+    async def set_description(self, message: types.Message, state: FSMContext):
+        if len(message.text) > MAX_EVENT_DESCRIPTION_LEN:
+            await message.answer(f'Длина описания события не должна превышать {MAX_EVENT_DESCRIPTION_LEN} символов')
+            return
+
+        await state.update_data(event_description=message.text)
+        keyboard = types.InlineKeyboardMarkup(row_width=1)
+        keyboard.add(*[
+            Button(text="Да", callback_data=CB_EVENT_POSITION+'_+'),
+            Button(text="Нет", callback_data=CB_EVENT_POSITION+'_-')
+        ])
+        await message.answer('Событие локализовано в какой-то области мира?', reply_markup=keyboard)
+        await self.yes_no_position.set()
+
+    async def ask_position(self, call: types.CallbackQuery, state: FSMContext):
+        sign = call.data.split('_')[-1]
+        controller = get_controller(call)
+        if sign == '+':
+            await call.message.reply_photo(
+                convert_image(controller.render_map(LayerName.EVENT.value)),
+                caption="Введите номер тайла, где совершиться событие",
+                reply=False,
+            )
+            await self.position.set()
+            await call.message.delete()
+        else:
+            user_data = await state.get_data()
+            controller.create_event(description=user_data.get('event_description'))
+            await _finalize_god_action(call, state)
+
+    async def set_position(self, message: types.Message, state: FSMContext):
+        is_incorrect = await is_position_incorrect(message, LayerName.EVENT)
+        if is_incorrect:
+            return
+
+        user_data = await state.get_data()
+        controller = get_controller(message)
+        controller.create_event(description=user_data.get('event_description'), position=message.text)
+        await _finalize_god_action(message, state)
+
+
 async def render_god_info(message: types.Message):
     controller = get_controller(message)
     keyboard = None
@@ -408,10 +472,20 @@ async def _end_round_answer(call_or_message: Union[types.Message, types.Callback
         await call_or_message.answer()
 
 
-async def _finalize_god_action(call: types.CallbackQuery, state: FSMContext):
+async def _finalize_god_action(
+        call_or_message: Union[types.Message, types.CallbackQuery],
+        state: FSMContext
+):
     """Надо вызывать в конце каждого божественного действия"""
     await state.finish()
-    await call.answer()
-    call.message.from_user = call.from_user
-    await render_god_info(call.message)
-    await call.message.delete()
+    if isinstance(call_or_message, types.CallbackQuery):
+        await call_or_message.answer()
+        call_or_message.message.from_user = call_or_message.from_user
+        await call_or_message.message.delete()
+        message = call_or_message.message
+    elif isinstance(call_or_message, types.Message):
+        message = call_or_message
+    else:
+        raise NotImplementedError
+    await render_god_info(message)
+
