@@ -1,3 +1,4 @@
+# todo вероятно стоит поделить на несколько файлов
 from typing import Union
 
 from aiogram import types, Dispatcher
@@ -28,13 +29,16 @@ CB_END_ERA = 'end_era'
 CB_CREATE_RACE = 'create_race'
 CB_CREATE_SUBRACE = 'create_subrace'
 CB_SET_START_ALIGNMENT = 'set_start_alignment'
+CB_CONTROL_RACE = 'control_race'
+CB_CHOOSE_RACE_FRACTION = 'choose_race_fraction'
+CB_CREATE_CITY = 'create_city'
 
 CB_CHANGE_RACE_ALIGNMENT = 'change_race_alignment'
 
 CB_EVENT = 'event'
 CB_EVENT_POSITION = 'event_position'
 
-MAX_RACE_NAME_LEN = 30
+MAX_NAME_LEN = 30
 MAX_RACE_DESCRIPTION_LEN = 500
 MAX_EVENT_DESCRIPTION_LEN = 200
 
@@ -51,6 +55,8 @@ def register_handlers_god_actions(dispatcher: Dispatcher):
     ChangeRaceAlignmentOrder().register(dispatcher)
 
     EventCreationOrder().register(dispatcher)
+
+    RaceControlOrder().register(dispatcher)
 
 
 def register_order_form_land(dispatcher: Dispatcher):
@@ -141,6 +147,7 @@ class GodActionOrder(StatesGroup):
             (Actions.INCREASE_REALM_ALIGNMENT, 'Очистить расу', CB_CHANGE_RACE_ALIGNMENT+'_+'),
             (Actions.DECREASE_REALM_ALIGNMENT, 'Совратить расу', CB_CHANGE_RACE_ALIGNMENT + '_-'),
             (Actions.EVENT, 'Событие', CB_EVENT),
+            (Actions.CONTROL_RACE, 'Управлять расой', CB_CONTROL_RACE),
         ]
         buttons_by_actions = {
             action.name: Button(text=f"{text} ({action.value.costs[n_era]} БС)", callback_data=cb)
@@ -256,8 +263,8 @@ class RaceCreationOrder(StatesGroup):
         await call.answer()
 
     async def set_name(self, message: types.Message, state: FSMContext):
-        if len(message.text) > MAX_RACE_NAME_LEN:
-            await message.answer(f'Название расы не может быть длиннее {MAX_RACE_NAME_LEN} символов')
+        if len(message.text) > MAX_NAME_LEN:
+            await message.answer(f'Название расы не может быть длиннее {MAX_NAME_LEN} символов')
             return
         controller = get_controller(message)
         if controller.is_race_exist(message.text):
@@ -407,14 +414,127 @@ class EventCreationOrder(StatesGroup):
             controller.create_event(description=user_data.get('event_description'))
             await _finalize_god_action(call, state)
 
-    async def set_position(self, message: types.Message, state: FSMContext):
+    @staticmethod
+    async def set_position(message: types.Message, state: FSMContext):
         is_incorrect = await is_position_incorrect(message, LayerName.EVENT)
         if is_incorrect:
             return
 
         user_data = await state.get_data()
         controller = get_controller(message)
-        controller.create_event(description=user_data.get('event_description'), position=message.text)
+        controller.create_event(description=user_data.get('event_description'), position=int(message.text))
+        await _finalize_god_action(message, state)
+
+
+class RaceControlOrder(StatesGroup):
+    race = State()
+    fraction = State()
+    action = State()
+    city_name = State()
+    city_position = State()
+
+    def register(self, dispatcher: Dispatcher):
+        dispatcher.register_callback_query_handler(
+            self.start_callback, text=CB_CONTROL_RACE, state=GodActionOrder.act,
+        )
+        dispatcher.register_callback_query_handler(
+            self.control_callback, Text(startswith=CB_CONTROL_RACE+'_'), state=self.race
+        )
+        dispatcher.register_callback_query_handler(
+            self.set_fraction_callback, Text(startswith=CB_CHOOSE_RACE_FRACTION+'_'), state=self.race
+        )
+        dispatcher.register_callback_query_handler(
+            self.create_city_callback, text=CB_CREATE_CITY, state=self.action
+        )
+        dispatcher.register_message_handler(
+            self.set_city_name, state=self.city_name,
+        )
+        dispatcher.register_message_handler(
+            self.set_city_position, state=self.city_position,
+        )
+
+    async def start_callback(self, call: types.CallbackQuery):
+        controller = get_controller(call)
+        keyboard = types.InlineKeyboardMarkup(row_width=1)
+        keyboard.add(*[
+            Button(text=race_name, callback_data=f"{CB_CONTROL_RACE}_{race_name}")
+            for race_name in controller.get_controlled_race_names()
+        ])
+        await call.message.edit_text(
+            'Выберите расу которой будете управлять:',
+            reply_markup=keyboard
+        )
+        await self.race.set()
+
+    async def control_callback(self, call: types.CallbackQuery, state: FSMContext):
+        race_name = call.data.split('_')[-1]
+        controller = get_controller(call)
+        fraction_names = controller.get_race_fraction_names(race_name)
+        if len(fraction_names) == 1:
+            await self.set_fraction_callback(call, state)
+            await state.update_data(fraction_name=fraction_names[0])
+        else:
+            keyboard = types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(*[
+                Button(text=name, callback_data=f'{CB_CHOOSE_RACE_FRACTION}_{name}')
+                for name in fraction_names
+            ])
+            await call.message.edit_text(
+                'Выберите орден:',
+                reply_markup=keyboard
+            )
+
+        await state.update_data(race_name=race_name)
+
+    async def set_fraction_callback(self, call: types.CallbackQuery, state: FSMContext):
+        fraction_name = call.data.split('_')[-1]
+        await state.update_data(fraction_name=fraction_name)
+
+        keyboard = types.InlineKeyboardMarkup(row_width=1)
+        keyboard.add(*[
+            Button(text='Создать город', callback_data=CB_CREATE_CITY)
+        ])
+        await call.message.edit_text(
+            'Выберите действие:',
+            reply_markup=keyboard
+        )
+        await self.action.set()
+
+    # todo вероятно отдельный класс на создание города но пока здесь
+    async def create_city_callback(self, call: types.CallbackQuery):
+        await call.message.edit_text(
+            'Введите название города',
+            reply_markup=None
+        )
+        await self.city_name.set()
+
+    async def set_city_name(self, message: types.Message, state: FSMContext):
+        if len(message.text) > MAX_NAME_LEN:
+            await message.answer(f"Название города не может быть больше {MAX_NAME_LEN} символов")
+            return
+        await state.update_data(city_name=message.text)
+        await self.city_position.set()
+        await message.reply_photo(
+            convert_image(get_controller(message).render_map(LayerName.RACE.name)),
+            caption=f'Введите номер тайла, где будет размещен город "{message.text}"',
+            reply=False
+        )
+
+    @staticmethod
+    async def set_city_position(message: types.Message, state: FSMContext):
+        is_incorrect = await is_position_incorrect(message, LayerName.RACE)
+        if is_incorrect:
+            return
+
+        user_data = await state.get_data()
+        controller = get_controller(message)
+        controller.create_city(
+            race_name=user_data.get('race_name'),
+            city_name=user_data.get('city_name'),
+            position=int(message.text),
+            fraction_name=user_data.get('fraction_name'),
+        )
+
         await _finalize_god_action(message, state)
 
 
@@ -488,4 +608,3 @@ async def _finalize_god_action(
     else:
         raise NotImplementedError
     await render_god_info(message)
-

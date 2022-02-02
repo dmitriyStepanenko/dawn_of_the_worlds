@@ -1,9 +1,7 @@
 from PIL import Image, ImageDraw
 
 from .model import Layer
-from .tiles import LandType, EventTile
-from .tiles import ClimateType
-from .tiles import InitPositionRaceTile
+from .tiles import LandType, ClimateType, ImageRef
 from pathlib import Path
 
 from .utils import get_coord_from_position
@@ -49,12 +47,15 @@ class ImageManager:
         return ImageCollection(images=images, image_size=images[LandType.WATER.value].size)
 
     def load_race_init_tiles(self):
-        init_pos_image = Image.open(self.image_dir / 'race_init_tile.png')
-        return ImageCollection({InitPositionRaceTile.__name__: init_pos_image}, image_size=init_pos_image.size)
+        images = {
+            ImageRef.RACE_INIT_POSITION.value: Image.open(self.image_dir / 'race_init_tile.png'),
+            ImageRef.CITY.value: Image.open(self.image_dir / 'city_tile.png'),
+        }
+        return ImageCollection(images, image_size=images[ImageRef.RACE_INIT_POSITION.value].size)
 
     def load_event_tiles(self):
         tile = Image.open(self.image_dir / 'event_tile.png')
-        return ImageCollection({EventTile.__name__: tile}, image_size=tile.size)
+        return ImageCollection({ImageRef.EVENT.value: tile}, image_size=tile.size)
 
     def load_climate_tiles(self):
         images = {

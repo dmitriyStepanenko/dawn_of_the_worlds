@@ -22,21 +22,21 @@ class Actions(Enum):
     CREATE_LAND = Action(name='CREATE_LAND', costs=[3, 5, 8])
     CREATE_CLIMATE = Action(name='CREATE_CLIMATE', costs=[2, 4, 6])
     CREATE_RACE = Action(name='CREATE_RACE', costs=[22, 6, 15])
-    CREATE_SUBRACE = Action(name='CREATE_SUBRACE', costs=[12, 4, 10])
+    # CREATE_SUBRACE = Action(name='CREATE_SUBRACE', costs=[12, 4, 10])
     CONTROL_RACE = Action(name='CONTROL_RACE', costs=[8, 4, 3])
-    CONTROL_CITY = Action(name='CONTROL_CITY', costs=[6, 4, 2])
+    # CONTROL_CITY = Action(name='CONTROL_CITY', costs=[6, 4, 2])
     DEVELOP_REALM = Action(name='DEVELOP_REALM', costs=[10, 5, 6])
-    DEVELOP_CITY = Action(name='DEVELOP_CITY', costs=[8, 4, 5])
+    # DEVELOP_CITY = Action(name='DEVELOP_CITY', costs=[8, 4, 5])
     INCREASE_REALM_ALIGNMENT = Action(name='INCREASE_REALM_ALIGNMENT', costs=[5, 3, 4])
     DECREASE_REALM_ALIGNMENT = Action(name='DECREASE_REALM_ALIGNMENT', costs=[4, 3, 3])
-    INCREASE_CITY_ALIGNMENT = Action(name='INCREASE_CITY_ALIGNMENT', costs=[4, 3, 3])
-    DECREASE_CITY_ALIGNMENT = Action(name='DECREASE_CITY_ALIGNMENT', costs=[3, 2, 2])
+    # INCREASE_CITY_ALIGNMENT = Action(name='INCREASE_CITY_ALIGNMENT', costs=[4, 3, 3])
+    # DECREASE_CITY_ALIGNMENT = Action(name='DECREASE_CITY_ALIGNMENT', costs=[3, 2, 2])
     EVENT = Action(name='EVENT', costs=[10, 7, 9])
     CREATE_ORDER = Action(name='CREATE_ORDER', costs=[8, 6, 4])
-    CONTROL_ORDER = Action(name='CONTROL_ORDER', costs=[4, 3, 2])
-    CREATE_AVATAR = Action(name='CREATE_AVATAR', costs=[10, 7, 8])
+    # CONTROL_ORDER = Action(name='CONTROL_ORDER', costs=[4, 3, 2])
+    # CREATE_AVATAR = Action(name='CREATE_AVATAR', costs=[10, 7, 8])
     # CONTROL_AVATAR = Action(name='CONTROL_AVATAR', costs=[2, 1, 1])
-    CATASTROPHE = Action(name='CATASTROPHE', costs=[10, 10, 10])
+    # CATASTROPHE = Action(name='CATASTROPHE', costs=[10, 10, 10])
 
 
 class GodProfile(BaseModel):
@@ -64,12 +64,12 @@ class GodProfile(BaseModel):
 
 
 class Avatar(BaseModel):
-    god_owner: GodProfile = Field(...)
+    god_owner: str = Field(...)
     name: str = Field(...)
 
 
 class RaceFraction(BaseModel):
-    god_owner: GodProfile = Field(...)
+    god_owner: str = Field(...)
     name: str = Field(...)
 
 
@@ -79,9 +79,17 @@ class Race(BaseModel):
     init_position: int = Field(...)
     avatars: dict[str, Avatar] = Field({})
     god_creator: str = Field(...)
-    fractions: dict[str, RaceFraction] = Field({})
+    fractions: list[RaceFraction] = Field([])
     alignment: int = Field(0)
     parent_name: Optional[str] = Field(None)
+    technologies: list[str] = Field([])
+
+
+class City(BaseModel):
+    name: str = Field(...)
+    base_race_name: str = Field(..., description='Раса которая создала город')
+    fractions: list[str] = Field(...)
+    alignment: int = Field(..., description='Изначально берется от базовой расы')
     technologies: list[str] = Field([])
 
 
@@ -112,16 +120,19 @@ class LayerName(Enum):
 
 class World(BaseModel):
     name: str = Field(...)
-    layers: dict[str, Layer] = Field({})
+    layers: dict[str, Layer] = Field({}, description='Слои по названиям')
     layers_shape: tuple[int, int] = Field(...)
     change_log: list[str] = Field([])
 
     gods: dict[int, GodProfile] = Field({}, description='Профайлы богов по id их владельцев')
-    races: dict[str, Race] = Field({})
+    races: dict[str, Race] = Field({}, description='Расы по названиям')
+    cities: list[City] = Field([])
     events: list[str] = Field([])
 
     redactor_god_id: Optional[int] = Field(None, description='id бога которому разрешено сейчас действовать')
-    current_message_with_buttons_id: Optional[int] = Field(None)
+    current_message_with_buttons_id: Optional[int] = Field(
+        None, description='id сообщения в котором есть кнопки с "божественными действиями", '
+                          'нужно чтобы было только одно сообщение с такими кнопками')
 
     n_era: int = Field(0)
     n_round: int = Field(0)

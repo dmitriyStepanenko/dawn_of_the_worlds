@@ -1,7 +1,7 @@
 from typing import Optional
 
-from .model import Actions, GodProfile, Race, Avatar, World, LayerName
-from .tiles import InitPositionRaceTile, Tile, LandType, ClimateType, EventTile
+from .model import Actions, GodProfile, Race, World, LayerName, RaceFraction, City
+from .tiles import Tile, ClimateType, ImageRef
 from .world_manager import WorldManager
 from app.storage.storage import Storage
 
@@ -56,7 +56,8 @@ class Controller:
         self.save()
         return god
 
-    def spend_force(self, value: int):
+    def spend_force(self, action: Actions):
+        value = self.world_manager.calc_action_cost(action)
         self.world_manager.spend_force(god_id=self._god_id, value=value)
 
     def next_redactor_god(self):
@@ -105,12 +106,21 @@ class Controller:
         self.current_god.confirm_end_era = True
         self.save()
 
-    def collect_allowed_actions(self):
+    def collect_allowed_actions(self) -> list[str]:
         if self.is_allowed_to_act:
-            return [
+            actions = [
                 action.name for action in Actions
                 if action.value.costs[self.world.n_era] <= self.current_god.value_force
             ]
+            if len(self.world.races) == 0:
+                if Actions.DECREASE_REALM_ALIGNMENT.name in actions:
+                    actions.remove(Actions.DECREASE_REALM_ALIGNMENT.name)
+                if Actions.INCREASE_REALM_ALIGNMENT.name in actions:
+                    actions.remove(Actions.INCREASE_REALM_ALIGNMENT.name)
+
+            if not self.world_manager.get_controlled_race_names(self._god_id) and Actions.CONTROL_RACE.name in actions:
+                actions.remove(Actions.CONTROL_RACE.name)
+            return actions
         return []
 
     def render_map(self, layer_name: str = None):
@@ -119,12 +129,10 @@ class Controller:
 
     def form_land(self, tile_type: str, tile_num: int):
         tile = Tile(position=tile_num, image_ref=tile_type)
-
-        force_value = self.world_manager.calc_action_cost(Actions.CREATE_LAND)
         tile.creator = self.current_god.name
         self.world_manager.change_tile(LayerName.LANDS, tile)
 
-        self.spend_force(value=force_value)
+        self.spend_force(Actions.CREATE_LAND)
         self.world_manager.log(f'{self.current_god} изменил ландшафт в координатах {tile.position} на {tile}')
         self.save()
 
@@ -133,11 +141,10 @@ class Controller:
             tile_type = None
         tile = Tile(position=tile_num, image_ref=tile_type)
 
-        force_value = self.world_manager.calc_action_cost(Actions.CREATE_CLIMATE)
         tile.creator = self.current_god.name
         self.world_manager.change_tile(LayerName.CLIMATE, tile)
 
-        self.spend_force(value=force_value)
+        self.spend_force(Actions.CREATE_CLIMATE)
         self.world_manager.log(f'{self.current_god} изменил климат в координатах {tile.position} на {tile}')
         self.save()
 
@@ -150,13 +157,13 @@ class Controller:
             description=description,
             init_position=init_position,
             god_creator=self.current_god.name,
-            alignment=alignment
+            alignment=alignment,
+            fractions=[RaceFraction(god_owner=self.current_god.name, name=name)]
         )
-        force_value = self.world_manager.calc_action_cost(Actions.CREATE_RACE)
         self.world_manager.world.races[race.name] = race
 
-        self.world_manager.change_tile(LayerName.RACE, InitPositionRaceTile(position=race.init_position))
-        self.spend_force(force_value)
+        self.world_manager.change_tile(LayerName.RACE, Tile(position=race.init_position))
+        self.spend_force(Actions.CREATE_RACE)
         self.world_manager.log(f'{self.current_god} создал расу {race.name} с начальной позицией {race.init_position}')
         self.save()
 
@@ -168,10 +175,9 @@ class Controller:
         else:
             raise NotImplementedError
 
-        force_value = self.world_manager.calc_action_cost(action)
         race = self.world_manager.get_race(race_name)
         race.alignment += alignment
-        self.spend_force(force_value)
+        self.spend_force(action)
         text_interpretation = 'очистил' if alignment == 1 else 'совратил'
         self.world_manager.log(f'{self.current_god} {text_interpretation} {race.name}')
         self.save()
@@ -179,102 +185,39 @@ class Controller:
     def get_race_names_and_alignments(self) -> list[tuple[str, int]]:
         return [(r.name, r.alignment) for r in self.world.races.values()]
 
+    def get_controlled_race_names(self):
+        return self.world_manager.get_controlled_race_names(self._god_id)
+
     def create_event(self, description: str, position: Optional[int] = None):
         add_message = ''
         if position is not None:
-            self.world_manager.change_tile(LayerName.EVENT, EventTile(position=position))
+            self.world_manager.change_tile(LayerName.EVENT, Tile(position=position, image_ref=ImageRef.EVENT.value))
             add_message = f'в координатах {position}'
         self.world.events.append(description)
-        force_value = self.world_manager.calc_action_cost(Actions.EVENT)
-        self.spend_force(force_value)
+        self.spend_force(Actions.EVENT)
         self.world_manager.log(f'{self.current_god} создал событие {description}' + add_message)
         self.save()
 
     def get_layer_num_tiles(self, layer_name: LayerName):
         return self.world_manager.get_layer(layer_name).num_tiles
 
-    # def control_race(self, god: GodProfile, race_name: str, race_action):
-    #     race = self.world_manager.get_race(race_name)
-    #
-    #     if god.name not in [f.god_owner.name for f in race.fractions.values()]:
-    #         raise ValueError(f'{god.name} не имеет влияния на расу {race_name}')
-    #
-    #     force_value = self.world_manager.calc_action_cost(Actions.CONTROL_RACE)
-    #     god.check_force_enough(force_value)
-    #     tile = race.apply_action(race_action)
-    #
-    #     if tile is not None:
-    #         layer_name = ...
-    #         layer = self.world_manager.get_layer(layer_name)
-    #         layer.replace_tile(tile)
-    #
-    #     god.spend_force(force_value)
-    #
-    #     self.world_manager.log(f'{god} приказал расе {race.name} {race_action.description}')
-    #
-    # def control_city(self, god: GodProfile, city_name: str, city_action):
-    #     city = self.world_manager.get_city(city_name)
-    #
-    #     if god.name not in [f.god_owner.name for f in city.fractions + city.avatars]:
-    #         raise ValueError(f'{god.name} не имеет влияния на город {city_name}')
-    #
-    #     force_value = self.world_manager.calc_action_cost(Actions.CONTROL_CITY)
-    #     god.check_force_enough(force_value)
-    #     tile = city.apply_action()
-    #
-    # def develop_race(self, god: GodProfile, race_name: str, technology: str):
-    #     race = self.world_manager.get_race(race_name)
-    #
-    #     force_value = self.world_manager.calc_action_cost(Actions.DEVELOP_REALM)
-    #     god.check_force_enough(force_value)
-    #
-    #     race.technologies.append(technology)
-    #     god.spend_force(force_value)
-    #     self.world_manager.log(f'{god} даровал расе знания: {technology}')
-    #
-    # def develop_city(self, god: GodProfile, city_name: str, technology: str):
-    #     city = self.world_manager.get_city(city_name)
-    #
-    #     force_value = self.world_manager.calc_action_cost(Actions.DEVELOP_CITY)
-    #     god.check_force_enough(force_value)
-    #
-    #     city.technologies.append(technology)
-    #     god.spend_force(force_value)
-    #     self.world_manager.log(f'{god} даровал городу знания: {technology}')
-    #
-    # def increase_city_alignment(self, god: GodProfile, city_name: str):
-    #     city = self.world_manager.get_city(city_name)
-    #
-    #     self.change_alignment(god, city, 1, Actions.INCREASE_CITY_ALIGNMENT)
-    #     self.world_manager.log(f'{god} очистил город {city_name}')
-    #
-    # def decrease_city_alignment(self, god: GodProfile, city_name: str):
-    #     city = self.world_manager.get_city(city_name)
-    #
-    #     self.change_alignment(god, city, -1, Actions.INCREASE_CITY_ALIGNMENT)
-    #     self.world_manager.log(f'{god} совратил город {city_name}')
-    #
-    # def create_order(self):
-    #     ...
-    #
-    # def control_order(self):
-    #     ...
-    #
-    # def create_avatar(self, god: GodProfile, race: Race, avatar: Avatar):
-    #     force_value = self.world_manager.calc_action_cost(Actions.CREATE_AVATAR)
-    #     god.check_force_enough(force_value)
-    #     race = self.world_manager.get_race(race.name)
-    #
-    #     if race.avatars.get(avatar.name) is None:
-    #         raise ValueError(f'Аватар {avatar.name} уже существует у расы {race.name}')
-    #
-    #     race.avatars[avatar.name] = avatar
-    #
-    #     god.spend_force(force_value)
-    #     self.world_manager.log(f'{god} создал аватара {avatar.name} у расы {race.name}')
-    #
-    # def control_avatar(self):
-    #     ...
-    #
-    # def catastrophe(self):
-    #     ...
+    def get_race_fraction_names(self, race_name: str):
+        race = self.world_manager.get_race(race_name)
+        return [
+            fraction.name for fraction in race.fractions
+            if fraction.god_owner == self.current_god.name
+        ]
+
+    def create_city(self, race_name: str, city_name: str, position: int, fraction_name: str):
+        race = self.world_manager.get_race(race_name)
+
+        self.world.cities.append(City(
+            name=city_name, base_race_name=race_name, fractions=[fraction_name], alignment=race.alignment))
+
+        self.world_manager.change_tile(LayerName.RACE, Tile(position=position, image_ref=ImageRef.CITY.value))
+        self.spend_force(Actions.CONTROL_RACE)
+
+        self.world_manager.log(
+            f'{self.current_god} приказал расе {race_name} основать город {city_name} в координатах {position}'
+        )
+        self.save()

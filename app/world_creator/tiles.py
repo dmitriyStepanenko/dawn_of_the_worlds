@@ -31,25 +31,16 @@ class LandType(Enum):
 class ClimateType(Enum):
     CLOUD = 'CLOUD'
     SNOW = 'SNOW'
-    # FOG = 'FOG'
     RAIN = 'RAIN'
     CLEAR = 'CLEAR'
 
 
-class InitPositionRaceTile(Tile):
-    def __init__(self, **data: Any):
-        super(InitPositionRaceTile, self).__init__(**data)
-        self.image_ref = self.__class__.__name__
-
-
-class EventTile(Tile):
-    def __init__(self, **data: Any):
-        super().__init__(**data)
-        self.image_ref = self.__class__.__name__
+class ImageRef(Enum):
+    RACE_INIT_POSITION = 'race_init_position'
+    CITY = 'city'
+    EVENT = 'event'
 
 
 TILES = Union[
     Tile,
-    InitPositionRaceTile,
-    EventTile,
 ]

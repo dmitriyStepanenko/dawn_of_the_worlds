@@ -4,7 +4,7 @@ from typing import Optional
 
 from PIL import Image
 
-from .image_manager import ImageCollection, ImageManager
+from .image_manager import ImageManager
 from .model import World, Actions
 from .model import Layer, LayerName
 from .tiles import Tile, EmptyTile
@@ -23,7 +23,6 @@ class WorldManager:
         self.world = world
 
         self.is_creation_end = False
-        self.REMOVE_COEFFICIENT = 1
 
     def end_of_world(self):
         self.log('Мир создан')
@@ -124,7 +123,7 @@ class WorldManager:
         layer = self.get_layer(layer_name)
         layer.tiles[tile.position] = tile
 
-    def calc_action_cost(self, action: Actions):
+    def calc_action_cost(self, action: Actions) -> int:
         return action.value.costs[self.world.n_era]
 
     def log(self, message: str):
@@ -149,6 +148,15 @@ class WorldManager:
             not_changed_tile_positions.remove(pos)
             filling_tile.position = pos
             layer.tiles[pos] = deepcopy(filling_tile)
+
+    def get_controlled_race_names(self, god_id: int):
+        god = self.world.gods.get(god_id)
+        race_names = []
+        for race in self.world.races.values():
+            for fraction in race.fractions:
+                if fraction.god_owner == god.name:
+                    race_names.append(race.name)
+        return race_names
 
     def render_map(
             self,
