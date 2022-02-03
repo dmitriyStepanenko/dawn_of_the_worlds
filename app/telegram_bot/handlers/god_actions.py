@@ -73,7 +73,7 @@ def register_order_form_land(dispatcher: Dispatcher):
     keyboard.add(*buttons)
     order_form_land = AddTileOrder(
         cb_start=CB_FORM_LAND,
-        layer_name=LayerName.LANDS.value,
+        layer_name=LayerName.LANDS,
         tile_type_keyboard=keyboard,
         form_tile_function=GodActionController.form_land
     )
@@ -93,7 +93,7 @@ def register_order_form_climate(dispatcher: Dispatcher):
     keyboard.add(*buttons)
     order_form_climate = AddTileOrder(
         cb_start=base_cb,
-        layer_name=LayerName.CLIMATE.value,
+        layer_name=LayerName.CLIMATE,
         tile_type_keyboard=keyboard,
         form_tile_function=GodActionController.form_climate
     )
@@ -178,7 +178,7 @@ class AddTileOrder(StatesGroup):
     coord = State()
     tile_type = State()
 
-    def __init__(self, cb_start, layer_name, tile_type_keyboard, form_tile_function):
+    def __init__(self, cb_start, layer_name: LayerName, tile_type_keyboard, form_tile_function):
         self.CB_START = cb_start
         self.LAYER_NAME = layer_name
         self.tile_type_keyboard = tile_type_keyboard
@@ -206,7 +206,7 @@ class AddTileOrder(StatesGroup):
         await self.coord.set()
         await call.message.delete()
         await call.message.reply_photo(
-            photo=convert_image(get_god_controller(call).render_map(self.LAYER_NAME)),
+            photo=convert_image(get_god_controller(call).render_map(self.LAYER_NAME.value)),
             caption=f'Введите номер тайла, где вы хотите {button_text}',
             reply=False,
         )
@@ -229,8 +229,7 @@ class AddTileOrder(StatesGroup):
         self.form_tile_function(controller, land_type_str, user_data["tile_num"])
 
         await call.message.reply_photo(
-            # todo проверить
-            photo=convert_image(controller.render_map(self.LAYER_NAME)),
+            photo=convert_image(controller.render_map(self.LAYER_NAME.value)),
             caption=f'Тайл {user_data["tile_num"]} изменен',
             reply=False,
         )
@@ -457,7 +456,7 @@ class RaceControlOrder(StatesGroup):
         )
 
     async def start_callback(self, call: types.CallbackQuery):
-        controller = get_race_controller(call)
+        controller = get_god_controller(call)
         keyboard = types.InlineKeyboardMarkup(row_width=1)
         keyboard.add(*[
             Button(text=race_name, callback_data=f"{CB_CONTROL_RACE}_{race_name}")

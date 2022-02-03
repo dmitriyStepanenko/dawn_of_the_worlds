@@ -233,7 +233,7 @@ async def render_world_map_callback(call: types.CallbackQuery):
 async def render_world_story_callback(call: types.CallbackQuery):
     controller = get_world_controller(call)
     if controller.is_world_created:
-        story = controller.world_manager.render_story()
+        story = controller.render_story()
         document = convert_text(story)
         document.filename = f'История мира {controller.world.name}.txt'
         await call.message.delete()
