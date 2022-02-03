@@ -8,12 +8,14 @@ from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.types import InlineKeyboardButton as Button
 
 from app.telegram_bot.utils import (
-    get_controller,
+    get_god_controller,
+    get_race_controller,
+    get_god_action_controller,
     convert_image,
     remove_buttons_from_current_message_with_buttons,
     is_position_incorrect
 )
-from app.world_creator.controller import Controller
+from app.world_creator.controller.controller import GodActionController
 
 from app.world_creator.tiles import LandType
 from app.world_creator.tiles import ClimateType
@@ -73,7 +75,7 @@ def register_order_form_land(dispatcher: Dispatcher):
         cb_start=CB_FORM_LAND,
         layer_name=LayerName.LANDS.value,
         tile_type_keyboard=keyboard,
-        form_tile_function=Controller.form_land
+        form_tile_function=GodActionController.form_land
     )
 
     order_form_land.register(dispatcher)
@@ -93,7 +95,7 @@ def register_order_form_climate(dispatcher: Dispatcher):
         cb_start=base_cb,
         layer_name=LayerName.CLIMATE.value,
         tile_type_keyboard=keyboard,
-        form_tile_function=Controller.form_climate
+        form_tile_function=GodActionController.form_climate
     )
 
     order_form_climate.register(dispatcher)
@@ -118,7 +120,7 @@ class GodActionOrder(StatesGroup):
 
     @staticmethod
     async def end_action_callback(call: types.CallbackQuery, state: FSMContext):
-        controller = get_controller(call)
+        controller = get_god_controller(call)
         controller.next_redactor_god()
         await call.message.edit_reply_markup(None)
         await state.finish()
@@ -130,13 +132,13 @@ class GodActionOrder(StatesGroup):
 
     @staticmethod
     async def end_era_callback(call: types.CallbackQuery):
-        controller = get_controller(call)
+        controller = get_god_controller(call)
         controller.end_era()
         await call.answer()
 
     @staticmethod
     async def spend_force_callback(call: types.CallbackQuery):
-        controller = get_controller(call)
+        controller = get_god_controller(call)
         allowed_actions = controller.collect_allowed_actions()
         n_era = controller.world.n_era
 
@@ -204,7 +206,7 @@ class AddTileOrder(StatesGroup):
         await self.coord.set()
         await call.message.delete()
         await call.message.reply_photo(
-            photo=convert_image(get_controller(call).render_map(self.LAYER_NAME)),
+            photo=convert_image(get_god_controller(call).render_map(self.LAYER_NAME)),
             caption=f'Введите номер тайла, где вы хотите {button_text}',
             reply=False,
         )
@@ -223,11 +225,12 @@ class AddTileOrder(StatesGroup):
         land_type_str = call.data.split('_')[-1]
         user_data = await state.get_data()
 
-        controller = get_controller(call)
+        controller = get_god_action_controller(call)
         self.form_tile_function(controller, land_type_str, user_data["tile_num"])
 
         await call.message.reply_photo(
-            photo=convert_image(get_controller(call).render_map(self.LAYER_NAME)),
+            # todo проверить
+            photo=convert_image(controller.render_map(self.LAYER_NAME)),
             caption=f'Тайл {user_data["tile_num"]} изменен',
             reply=False,
         )
@@ -266,7 +269,7 @@ class RaceCreationOrder(StatesGroup):
         if len(message.text) > MAX_NAME_LEN:
             await message.answer(f'Название расы не может быть длиннее {MAX_NAME_LEN} символов')
             return
-        controller = get_controller(message)
+        controller = get_race_controller(message)
         if controller.is_race_exist(message.text):
             await message.answer('Раса с таким названием уже существует, введите другое')
             return
@@ -281,7 +284,7 @@ class RaceCreationOrder(StatesGroup):
         user_data = await state.get_data()
         race_name = user_data.get('race_name')
         await message.reply_photo(
-            convert_image(get_controller(message).render_map(LayerName.RACE.value)),
+            convert_image(get_god_controller(message).render_map(LayerName.RACE.value)),
             caption=f'Введите номер тайла, где "{race_name}" появятся в мире',
             reply=False
         )
@@ -313,7 +316,7 @@ class RaceCreationOrder(StatesGroup):
     async def set_alignment(call: types.CallbackQuery, state: FSMContext):
         sign = call.data.split('_')[-1]
         alignment_by_sign = {'+': 1, '0': 0, '-': -1}
-        controller = get_controller(call)
+        controller = get_race_controller(call)
         user_data = await state.get_data()
         controller.create_race(
             name=user_data['race_name'],
@@ -338,7 +341,7 @@ class ChangeRaceAlignmentOrder(StatesGroup):
     async def choose_race(self, call: types.CallbackQuery, state: FSMContext):
         sing = call.data.split('_')[-1]
         await state.update_data(race_alignment={'+': 1, '-': -1}.get(sing))
-        controller = get_controller(call)
+        controller = get_race_controller(call)
         buttons = [
             Button(text=f'{name} ({alignment})', callback_data=f'{CB_CHANGE_RACE_ALIGNMENT}_{name}')
             for name, alignment in controller.get_race_names_and_alignments()
@@ -355,7 +358,7 @@ class ChangeRaceAlignmentOrder(StatesGroup):
     async def change_race_alignment(call: types.CallbackQuery, state: FSMContext):
         race_name = call.data.split('_')[-1]
         user_data = await state.get_data()
-        controller = get_controller(call)
+        controller = get_race_controller(call)
         controller.change_race_alignment(race_name, user_data['race_alignment'])
         await _finalize_god_action(call, state)
 
@@ -400,7 +403,7 @@ class EventCreationOrder(StatesGroup):
 
     async def ask_position(self, call: types.CallbackQuery, state: FSMContext):
         sign = call.data.split('_')[-1]
-        controller = get_controller(call)
+        controller = get_god_action_controller(call)
         if sign == '+':
             await call.message.reply_photo(
                 convert_image(controller.render_map(LayerName.EVENT.value)),
@@ -421,7 +424,7 @@ class EventCreationOrder(StatesGroup):
             return
 
         user_data = await state.get_data()
-        controller = get_controller(message)
+        controller = get_god_action_controller(message)
         controller.create_event(description=user_data.get('event_description'), position=int(message.text))
         await _finalize_god_action(message, state)
 
@@ -454,7 +457,7 @@ class RaceControlOrder(StatesGroup):
         )
 
     async def start_callback(self, call: types.CallbackQuery):
-        controller = get_controller(call)
+        controller = get_race_controller(call)
         keyboard = types.InlineKeyboardMarkup(row_width=1)
         keyboard.add(*[
             Button(text=race_name, callback_data=f"{CB_CONTROL_RACE}_{race_name}")
@@ -468,7 +471,7 @@ class RaceControlOrder(StatesGroup):
 
     async def control_callback(self, call: types.CallbackQuery, state: FSMContext):
         race_name = call.data.split('_')[-1]
-        controller = get_controller(call)
+        controller = get_race_controller(call)
         fraction_names = controller.get_race_fraction_names(race_name)
         if len(fraction_names) == 1:
             await self.set_fraction_callback(call, state)
@@ -515,7 +518,7 @@ class RaceControlOrder(StatesGroup):
         await state.update_data(city_name=message.text)
         await self.city_position.set()
         await message.reply_photo(
-            convert_image(get_controller(message).render_map(LayerName.RACE.name)),
+            convert_image(get_race_controller(message).render_map(LayerName.RACE.name)),
             caption=f'Введите номер тайла, где будет размещен город "{message.text}"',
             reply=False
         )
@@ -527,7 +530,7 @@ class RaceControlOrder(StatesGroup):
             return
 
         user_data = await state.get_data()
-        controller = get_controller(message)
+        controller = get_race_controller(message)
         controller.create_city(
             race_name=user_data.get('race_name'),
             city_name=user_data.get('city_name'),
@@ -539,7 +542,7 @@ class RaceControlOrder(StatesGroup):
 
 
 async def render_god_info(message: types.Message):
-    controller = get_controller(message)
+    controller = get_god_controller(message)
     keyboard = None
     if controller.is_allowed_to_act:
         if not controller.collect_allowed_actions():
@@ -571,7 +574,7 @@ async def render_god_info(message: types.Message):
 
 
 async def _end_round_answer(call_or_message: Union[types.Message, types.CallbackQuery]):
-    controller = get_controller(call_or_message)
+    controller = get_god_controller(call_or_message)
     n_round = controller.world.n_round
     n_era = controller.world.n_era
     controller.next_redactor_god()

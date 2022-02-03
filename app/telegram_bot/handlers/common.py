@@ -5,7 +5,7 @@ from aiogram.dispatcher.filters import Text
 
 from app.telegram_bot.keyboards import get_one_button_keyboard
 from app.telegram_bot.handlers.world import CB_CREATE_WORLD
-from app.telegram_bot.utils import get_controller
+from app.telegram_bot.utils import get_god_controller
 
 STATIC_DIR = Path(__file__).parent.parent.parent / 'data' / 'static'
 CMD_CANCEL = 'cancel'
@@ -39,7 +39,7 @@ async def cmd_help(message: types.Message):
 
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.finish()
-    if not get_controller(message).is_world_created:
+    if not get_god_controller(message).is_world_created:
         await message.answer(
             "Привет! Я бот для игры 'Рассвет миров'! \n Для начала создайте мир:",
             reply_markup=get_one_button_keyboard('Создать мир', CB_CREATE_WORLD),

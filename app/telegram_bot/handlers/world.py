@@ -6,9 +6,9 @@ from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram import types, Dispatcher
 
 
-from app.telegram_bot.utils import convert_image, get_controller, is_user_admin, is_admin_state, convert_text
+from app.telegram_bot.utils import convert_image, is_user_admin, is_admin_state, convert_text, get_world_controller
 from app.telegram_bot.keyboards import get_one_button_keyboard
-from app.world_creator.controller import Controller
+from app.world_creator.controller.controller import Controller
 from app.world_creator.model import MAX_SIZE_LAYER
 
 
@@ -53,8 +53,8 @@ class WorldCreationOrder(StatesGroup):
         dispatcher.register_callback_query_handler(self.create_world_callback, text=CB_CREATE_WORLD, state=self.start)
 
     async def create_world_callback(self, call: types.CallbackQuery, state: FSMContext):
-        controller = get_controller(call)
-        if get_controller(call).is_world_created:
+        controller = get_world_controller(call)
+        if controller.is_world_created:
             await call.message.edit_text('мир уже создан')
             await state.finish()
             await WorldRenderOrder().render_world_info(call.message, controller)
@@ -101,7 +101,7 @@ class WorldCreationOrder(StatesGroup):
         percent = int(call.data.split('_')[-1])
         user_data = await state.get_data()
 
-        controller = get_controller(call)
+        controller = get_world_controller(call)
         controller.create_world(name=user_data['name'], layers_shape=user_data['size'], percent=percent)
         await state.finish()
         await call.message.delete()
@@ -125,7 +125,7 @@ class WorldRenderOrder(StatesGroup):
             admin_buttons = [
                 types.InlineKeyboardButton(text="Удалить мир", callback_data=CB_DELETE_WORLD)
             ]
-            if not get_controller(message_or_call).world.is_start_game:
+            if not get_world_controller(message_or_call).world.is_start_game:
                 admin_buttons.append(types.InlineKeyboardButton(text="Начать игру", callback_data=CB_START_GAME))
             keyboard.add(*admin_buttons)
         return keyboard
@@ -165,7 +165,7 @@ async def create_world(message: types.Message):
 
 
 async def cmd_get_world(message: types.Message):
-    controller = get_controller(message)
+    controller = get_world_controller(message)
     if controller.is_world_created:
         await WorldRenderOrder().render_world_info(message, controller)
     else:
@@ -189,7 +189,7 @@ class WorldDeletionOrder(StatesGroup):
             await call.answer('Эта кнопка для администратора')
             return
 
-        controller = get_controller(call)
+        controller = get_world_controller(call)
         if not controller.is_world_created:
             await create_world(call.message)
         else:
@@ -200,7 +200,7 @@ class WorldDeletionOrder(StatesGroup):
     @staticmethod
     async def world_deleted(message: types.Message, state: FSMContext):
         if message.text == 'да':
-            controller = get_controller(message)
+            controller = get_world_controller(message)
             controller.remove_world()
             await state.finish()
             await message.answer('мир удален')
@@ -214,7 +214,7 @@ class WorldDeletionOrder(StatesGroup):
 
 
 async def render_world_map_callback(call: types.CallbackQuery):
-    controller = get_controller(call)
+    controller = get_world_controller(call)
     if controller.is_world_created:
         image = controller.render_map()
         await call.message.delete()
@@ -231,7 +231,7 @@ async def render_world_map_callback(call: types.CallbackQuery):
 
 
 async def render_world_story_callback(call: types.CallbackQuery):
-    controller = get_controller(call)
+    controller = get_world_controller(call)
     if controller.is_world_created:
         story = controller.world_manager.render_story()
         document = convert_text(story)
@@ -252,7 +252,7 @@ async def render_world_story_callback(call: types.CallbackQuery):
 async def start_game_callback(call: types.CallbackQuery):
     is_admin = await is_user_admin(call)
     if is_admin:
-        get_controller(call).start_game()
+        get_world_controller(call).start_game()
         await call.message.edit_reply_markup(None)
         await call.answer()
     else:

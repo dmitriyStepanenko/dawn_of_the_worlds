@@ -1,9 +1,8 @@
-import aiogram.utils.exceptions
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram import types, Dispatcher
 
-from app.telegram_bot.utils import get_controller
+from app.telegram_bot.utils import get_god_controller
 from app.telegram_bot.keyboards import get_one_button_keyboard
 from app.telegram_bot.handlers.world import create_world
 from app.telegram_bot.handlers.god_actions import render_god_info
@@ -30,7 +29,7 @@ class GodCreationOrder(StatesGroup):
         dispatcher.register_message_handler(self.set_god_name, state=self.name)
 
     async def create_god_callback(self, call: types.CallbackQuery):
-        controller = get_controller(call)
+        controller = get_god_controller(call)
         if not controller.is_world_created:
             await create_world(call.message)
             return
@@ -49,7 +48,7 @@ class GodCreationOrder(StatesGroup):
             await message.answer(f'Имя бога должно быть не больше {MAX_GOD_NAME_LEN} символов')
             return
 
-        controller = get_controller(message)
+        controller = get_god_controller(message)
         if not controller.add_god(message.text):
             await message.answer(f'Уже есть бог с именем {message.text}, выберите другое')
             return
@@ -58,8 +57,8 @@ class GodCreationOrder(StatesGroup):
         await render_god_info(message)
 
 
-async def cmd_get_god(message: types.Message, state: FSMContext):
-    controller = get_controller(message)
+async def cmd_get_god(message: types.Message):
+    controller = get_god_controller(message)
     if not controller.is_world_created:
         await create_world(message)
         return
@@ -79,7 +78,3 @@ async def cmd_get_god(message: types.Message, state: FSMContext):
         return
 
     await render_god_info(message)
-
-
-
-

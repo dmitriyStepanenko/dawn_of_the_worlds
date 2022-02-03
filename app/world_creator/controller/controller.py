@@ -1,8 +1,8 @@
 from typing import Optional
 
-from .model import Actions, GodProfile, Race, World, LayerName, RaceFraction, City
-from .tiles import Tile, ClimateType, ImageRef
-from .world_manager import WorldManager
+from ..model import Actions, GodProfile, Race, World, LayerName, RaceFraction, City
+from ..tiles import Tile, ClimateType, ImageRef
+from ..world_manager import WorldManager
 from app.storage.storage import Storage
 
 
@@ -28,9 +28,22 @@ class Controller:
     def is_world_created(self):
         return self.storage.is_world_exist(self._world_id)
 
+    def get_layer_num_tiles(self, layer_name: LayerName):
+        return self.world_manager.get_layer(layer_name).num_tiles
+
     def save(self):
         self.storage.save_world(self._world_id, self.world)
 
+    def spend_force(self, action: Actions):
+        value = self.world_manager.calc_action_cost(action)
+        self.world_manager.spend_force(god_id=self._god_id, value=value)
+
+    def render_map(self, layer_name: str = None):
+        layer_names = {l_name.value: l_name for l_name in LayerName}
+        return self.world_manager.render_map(layer_names.get(layer_name))
+
+
+class WorldController(Controller):
     def create_world(self, name: str, layers_shape: tuple[int, int], percent: int):
         world = World(name=name, layers_shape=layers_shape)
         self.world_manager = WorldManager(world)
@@ -45,6 +58,8 @@ class Controller:
         self.world.is_start_game = True
         self.save()
 
+
+class GodController(Controller):
     def add_god(self, name: str):
         if name in self.world.god_names:
             return None
@@ -55,10 +70,6 @@ class Controller:
             self.world.redactor_god_id = self._god_id
         self.save()
         return god
-
-    def spend_force(self, action: Actions):
-        value = self.world_manager.calc_action_cost(action)
-        self.world_manager.spend_force(god_id=self._god_id, value=value)
 
     def next_redactor_god(self):
         god_ids = [god_id for god_id, god in self.world.gods.items() if not god.confirm_end_round]
@@ -123,10 +134,8 @@ class Controller:
             return actions
         return []
 
-    def render_map(self, layer_name: str = None):
-        layer_names = {l_name.value: l_name for l_name in LayerName}
-        return self.world_manager.render_map(layer_names.get(layer_name))
 
+class GodActionController(Controller):
     def form_land(self, tile_type: str, tile_num: int):
         tile = Tile(position=tile_num, image_ref=tile_type)
         tile.creator = self.current_god.name
@@ -148,6 +157,18 @@ class Controller:
         self.world_manager.log(f'{self.current_god} изменил климат в координатах {tile.position} на {tile}')
         self.save()
 
+    def create_event(self, description: str, position: Optional[int] = None):
+        add_message = ''
+        if position is not None:
+            self.world_manager.change_tile(LayerName.EVENT, Tile(position=position, image_ref=ImageRef.EVENT.value))
+            add_message = f'в координатах {position}'
+        self.world.events.append(description)
+        self.spend_force(Actions.EVENT)
+        self.world_manager.log(f'{self.current_god} создал событие {description}' + add_message)
+        self.save()
+
+
+class RaceController(Controller):
     def is_race_exist(self, race_name: str):
         self.world_manager.is_exist_race(race_name)
 
@@ -185,21 +206,8 @@ class Controller:
     def get_race_names_and_alignments(self) -> list[tuple[str, int]]:
         return [(r.name, r.alignment) for r in self.world.races.values()]
 
-    def get_controlled_race_names(self):
+    def get_controlled_race_names(self) -> list[str]:
         return self.world_manager.get_controlled_race_names(self._god_id)
-
-    def create_event(self, description: str, position: Optional[int] = None):
-        add_message = ''
-        if position is not None:
-            self.world_manager.change_tile(LayerName.EVENT, Tile(position=position, image_ref=ImageRef.EVENT.value))
-            add_message = f'в координатах {position}'
-        self.world.events.append(description)
-        self.spend_force(Actions.EVENT)
-        self.world_manager.log(f'{self.current_god} создал событие {description}' + add_message)
-        self.save()
-
-    def get_layer_num_tiles(self, layer_name: LayerName):
-        return self.world_manager.get_layer(layer_name).num_tiles
 
     def get_race_fraction_names(self, race_name: str):
         race = self.world_manager.get_race(race_name)

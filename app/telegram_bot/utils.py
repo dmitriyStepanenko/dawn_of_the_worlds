@@ -6,7 +6,13 @@ from PIL import Image
 from aiogram import types, Dispatcher
 from aiogram.utils.exceptions import MessageToEditNotFound, MessageNotModified
 
-from app.world_creator.controller import Controller
+from app.world_creator.controller.controller import (
+    Controller,
+    GodController,
+    GodActionController,
+    WorldController,
+    RaceController,
+)
 from app.world_creator.model import LayerName
 
 
@@ -59,8 +65,8 @@ async def is_user_admin(message_or_call: Union[types.Message, types.CallbackQuer
     return True
 
 
-def get_controller(message_or_call: Union[types.CallbackQuery, types.Message]) -> Controller:
-    return Controller(get_chat_id(message_or_call), message_or_call.from_user.id)
+def get_world_god_ids(message_or_call: Union[types.CallbackQuery, types.Message]) -> tuple[int, int]:
+    return get_chat_id(message_or_call), message_or_call.from_user.id
 
 
 async def remove_buttons_from_current_message_with_buttons(message, controller):
@@ -82,10 +88,30 @@ async def is_position_incorrect(message: types.Message, layer_name: LayerName, c
     tile_num = int(message.text)
 
     if not controller:
-        controller = get_controller(message)
+        controller = Controller(*get_world_god_ids(message))
     max_num = controller.get_layer_num_tiles(layer_name)
     if max_num < tile_num < 0:
         await message.answer(f'Номер тайла не может превышать {max_num}')
         return True
 
     return False
+
+
+def get_world_controller(message_or_call: Union[types.Message, types.CallbackQuery]) -> WorldController:
+    world_id, god_id = get_world_god_ids(message_or_call=message_or_call)
+    return WorldController(world_id=world_id, god_id=god_id)
+
+
+def get_god_controller(message_or_call: Union[types.Message, types.CallbackQuery]) -> GodController:
+    world_id, god_id = get_world_god_ids(message_or_call)
+    return GodController(world_id=world_id, god_id=god_id)
+
+
+def get_god_action_controller(message_or_call: Union[types.Message, types.CallbackQuery]) -> GodActionController:
+    world_id, god_id = get_world_god_ids(message_or_call)
+    return GodActionController(world_id=world_id, god_id=god_id)
+
+
+def get_race_controller(message_or_call: Union[types.Message, types.CallbackQuery]) -> RaceController:
+    world_id, god_id = get_world_god_ids(message_or_call)
+    return RaceController(world_id=world_id, god_id=god_id)
