@@ -8,7 +8,7 @@ from aiogram import types, Dispatcher
 
 from app.telegram_bot.utils import convert_image, is_user_admin, is_admin_state, convert_text, get_world_controller
 from app.telegram_bot.keyboards import get_one_button_keyboard
-from app.world_creator.controller.controller import Controller
+from app.world_creator.controller import Controller
 from app.world_creator.model import MAX_SIZE_LAYER
 
 

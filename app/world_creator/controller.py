@@ -1,8 +1,8 @@
 from typing import Optional
 
-from ..model import Actions, GodProfile, Race, World, LayerName, RaceFraction, City
-from ..tiles import Tile, ClimateType, ImageRef
-from ..world_manager import Manager, WorldManager, GodManager, RaceManager
+from .model import Actions, GodProfile, Race, World, LayerName, RaceFraction, City
+from .tiles import Tile, ClimateType, ImageRef
+from .world_manager import Manager, WorldManager, GodManager, RaceManager
 from app.storage.storage import Storage
 
 
@@ -30,6 +30,10 @@ class Controller:
     @property
     def is_world_created(self):
         return self.storage.is_world_exist(self._world_id)
+
+    @property
+    def is_creation_end(self):
+        return self.manager.is_creation_end
 
     def get_layer_num_tiles(self, layer_name: LayerName):
         return self.manager.get_layer(layer_name).num_tiles

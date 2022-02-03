@@ -1,4 +1,3 @@
-# todo вероятно стоит поделить на несколько файлов
 from typing import Union
 
 from aiogram import types, Dispatcher
@@ -15,7 +14,7 @@ from app.telegram_bot.utils import (
     remove_buttons_from_current_message_with_buttons,
     is_position_incorrect
 )
-from app.world_creator.controller.controller import GodActionController
+from app.world_creator.controller import GodActionController
 
 from app.world_creator.tiles import LandType
 from app.world_creator.tiles import ClimateType
@@ -59,6 +58,7 @@ def register_handlers_god_actions(dispatcher: Dispatcher):
     EventCreationOrder().register(dispatcher)
 
     RaceControlOrder().register(dispatcher)
+    CityCreationOrder().register(dispatcher)
 
 
 def register_order_form_land(dispatcher: Dispatcher):
@@ -432,8 +432,6 @@ class RaceControlOrder(StatesGroup):
     race = State()
     fraction = State()
     action = State()
-    city_name = State()
-    city_position = State()
 
     def register(self, dispatcher: Dispatcher):
         dispatcher.register_callback_query_handler(
@@ -444,15 +442,6 @@ class RaceControlOrder(StatesGroup):
         )
         dispatcher.register_callback_query_handler(
             self.set_fraction_callback, Text(startswith=CB_CHOOSE_RACE_FRACTION+'_'), state=self.race
-        )
-        dispatcher.register_callback_query_handler(
-            self.create_city_callback, text=CB_CREATE_CITY, state=self.action
-        )
-        dispatcher.register_message_handler(
-            self.set_city_name, state=self.city_name,
-        )
-        dispatcher.register_message_handler(
-            self.set_city_position, state=self.city_position,
         )
 
     async def start_callback(self, call: types.CallbackQuery):
@@ -502,7 +491,22 @@ class RaceControlOrder(StatesGroup):
         )
         await self.action.set()
 
-    # todo вероятно отдельный класс на создание города но пока здесь
+
+class CityCreationOrder(StatesGroup):
+    city_name = State()
+    city_position = State()
+
+    def register(self, dispatcher: Dispatcher):
+        dispatcher.register_callback_query_handler(
+            self.create_city_callback, text=CB_CREATE_CITY, state=RaceControlOrder.action
+        )
+        dispatcher.register_message_handler(
+            self.set_city_name, state=self.city_name,
+        )
+        dispatcher.register_message_handler(
+            self.set_city_position, state=self.city_position,
+        )
+
     async def create_city_callback(self, call: types.CallbackQuery):
         await call.message.edit_text(
             'Введите название города',
@@ -583,7 +587,7 @@ async def _end_round_answer(call_or_message: Union[types.Message, types.Callback
 
     state = Dispatcher.get_current().current_state()
     await state.finish()
-    if controller.world_manager.is_creation_end:
+    if controller.is_creation_end:
         await message.answer('Мир создан')
     elif n_round < controller.world.n_round:
         await message.answer('Начался новый раунд, боги получили силу, мир стал старше')

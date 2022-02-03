@@ -4,7 +4,15 @@ from typing import Optional
 
 from PIL import Image
 
-from .image_manager import ImageManager
+from .image_manager import (
+    load_climate_tiles,
+    load_event_tiles,
+    load_land_tiles,
+    load_race_init_tiles,
+    render_layer,
+    draw_grid,
+    paste_scaled_image_with_alpha
+)
 from .model import World, Actions
 from .model import Layer, LayerName
 from .tiles import Tile, EmptyTile
@@ -62,27 +70,25 @@ class Manager:
         return layer
 
     def render_map(self, add_grid_for_layer: Optional[LayerName] = None) -> Image:
-        image_manager = ImageManager()
-
         world_map_image = None
         image_collection_loaders = [
-            image_manager.load_land_tiles,
-            image_manager.load_climate_tiles,
-            image_manager.load_race_init_tiles,
-            image_manager.load_event_tiles,
+            load_land_tiles,
+            load_climate_tiles,
+            load_race_init_tiles,
+            load_event_tiles,
         ]
         for layer_name, image_collection_loader in zip(LayerName, image_collection_loaders):
             layer = self.get_layer(layer_name)
-            layer_image = image_manager.render_layer(layer, image_collection_loader())
+            layer_image = render_layer(layer, image_collection_loader())
             if world_map_image:
-                image_manager.paste_scaled_image_with_alpha(world_map_image, layer_image)
+                paste_scaled_image_with_alpha(world_map_image, layer_image)
             else:
                 world_map_image = layer_image
 
         if add_grid_for_layer:
             gird_layer = self.get_layer(add_grid_for_layer)
-            grid_image = image_manager.draw_grid(world_map_image.size, gird_layer.shape)
-            image_manager.paste_scaled_image_with_alpha(world_map_image, grid_image)
+            grid_image = draw_grid(world_map_image.size, gird_layer.shape)
+            paste_scaled_image_with_alpha(world_map_image, grid_image)
 
         return world_map_image
 

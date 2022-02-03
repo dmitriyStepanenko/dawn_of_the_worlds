@@ -6,7 +6,7 @@ from PIL import Image
 from aiogram import types, Dispatcher
 from aiogram.utils.exceptions import MessageToEditNotFound, MessageNotModified
 
-from app.world_creator.controller.controller import (
+from app.world_creator.controller import (
     Controller,
     GodController,
     GodActionController,

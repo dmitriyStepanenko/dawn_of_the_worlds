@@ -55,5 +55,5 @@ async def cmd_cancel(message: types.Message, state: FSMContext):
         await message.answer("Действие отменено", reply_markup=types.ReplyKeyboardRemove())
 
 
-async def no_state_callback(call: types.CallbackQuery, state: FSMContext):
+async def no_state_callback(call: types.CallbackQuery):
     await call.answer('Это не ваша кнопка, поищите себе другую)')
