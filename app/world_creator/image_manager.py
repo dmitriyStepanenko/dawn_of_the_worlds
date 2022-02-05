@@ -11,9 +11,9 @@ IMAGE_DIR = Path(__file__).parent.parent / 'data' / 'static' / 'tile_pics'
 
 
 class ImageCollection:
-    def __init__(self, images: dict, image_size: tuple[int, int]):
+    def __init__(self, images: dict[str, Image], image_size: tuple[int, int]):
         """Коллекция изображений с одинаковым размером"""
-        self.images: dict[str, Image] = images
+        self.images = images
         self.image_size = image_size
         self.validate()
 

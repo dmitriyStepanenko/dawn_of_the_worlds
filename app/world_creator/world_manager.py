@@ -176,7 +176,7 @@ class GodManager(Manager):
         god = self.world.gods[god_id]
         bonus = god.bonus_force
         if god.value_force < 5:
-            if god.bonus_force < 4:
+            if god.bonus_force < 3:
                 god.bonus_force += 1
         else:
             god.bonus_force = 0
