@@ -201,20 +201,34 @@
 ## Пример игры
 Первый делом приглашаем бота в чат.
 Далее если ввести команду /world_info (или /god_info) можно будет создать мир.
+
 ![Начало](https://github.com/dmitriyStepanenko/dawn_of_the_worlds/raw/some_images/bot_printscreens/start.png)
+
 После нажатия на кнопку "Создать мир" предлагается заполнить различные параметры мира.
+
 ![Создание мира](https://github.com/dmitriyStepanenko/dawn_of_the_worlds/raw/some_images/bot_printscreens/world_creation.png)
+
 После того как мир создан можно посмотреть на то, как он выглядит
+
 ![Карта мира](https://github.com/dmitriyStepanenko/dawn_of_the_worlds/raw/some_images/bot_printscreens/show_map.png)
+
 Далее введем команду /god_info и создадим бога
+
 ![Создание бога](https://github.com/dmitriyStepanenko/dawn_of_the_worlds/raw/some_images/bot_printscreens/create_god.png)
+
 И после того как администратор нажмет кнопку "Начать игру" появятся кнопки 
+
 ![Мой бог после начала игры](https://github.com/dmitriyStepanenko/dawn_of_the_worlds/raw/some_images/bot_printscreens/god_info_after_start_game.png)
+
 Нажав на кнопку "Потратить силу" получим набор кнопок с доступными нам божественными 
 действиями (сейчас их всего два поскольку сила 7)
+
 ![божественные действия](https://github.com/dmitriyStepanenko/dawn_of_the_worlds/raw/some_images/bot_printscreens/spend_force.png)
+
 Для примера изменим климатическую зону в 3 тайле на снег
+
 ![добавить климат](https://github.com/dmitriyStepanenko/dawn_of_the_worlds/raw/some_images/bot_printscreens/form_climate.png)
+
 ![результат добавления климата](https://github.com/dmitriyStepanenko/dawn_of_the_worlds/raw/some_images/bot_printscreens/end_of_form_climate.png)
 # Заключение
 Итак, я сделал телеграмм бота, который позволяет играть в "Рассвет миров".
