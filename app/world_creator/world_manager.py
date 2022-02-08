@@ -63,8 +63,8 @@ class Manager:
         self.world.layers[layer_name.value] = Layer(layer_name=layer_name.value, shape=shape or self.world.layers_shape)
         self.fill_layer(layer_name, EmptyTile(position=0))
 
-    def get_layer(self, layer_name: LayerName):
-        layer: Layer = self.world.layers.get(layer_name.value)
+    def get_layer(self, layer_name: LayerName) -> Layer:
+        layer = self.world.layers.get(layer_name.value)
         if layer is None:
             raise ValueError(f'Нет слоя с названием: {layer_name}')
         return layer
@@ -85,6 +85,7 @@ class Manager:
             else:
                 world_map_image = layer_image
 
+        assert world_map_image  # для mypy, точно знаем что не None
         if add_grid_for_layer:
             gird_layer = self.get_layer(add_grid_for_layer)
             grid_image = draw_grid(world_map_image.size, gird_layer.shape)
@@ -185,6 +186,8 @@ class GodManager(Manager):
 
     def get_controlled_race_names(self) -> list[str]:
         god = self.world.gods.get(self._god_id)
+        if not god:
+            raise ValueError(f'Нет бога с id {self._god_id}')
         race_names = []
         for race in self.world.races.values():
             for fraction in race.fractions:
@@ -194,8 +197,8 @@ class GodManager(Manager):
 
 
 class RaceManager(Manager):
-    def get_race(self, name: str):
-        race: Race = self.world.races.get(name)
+    def get_race(self, name: str) -> Race:
+        race = self.world.races.get(name)
         if race is None:
             raise ValueError(f'Нет расы с названием: {name}')
         return race

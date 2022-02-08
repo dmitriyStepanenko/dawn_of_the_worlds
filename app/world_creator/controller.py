@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 from .model import Actions, GodProfile, Race, World, LayerName, RaceFraction, City
 from .tiles import Tile, ClimateType, ImageRef
@@ -12,7 +12,6 @@ class Controller:
         self._god_id = god_id
         self._world_id = world_id
 
-        self.manager = None
         self._init_manager()
 
     def _init_manager(self):
@@ -25,6 +24,7 @@ class Controller:
 
     @property
     def world(self) -> World:
+        assert self.manager  # для mypy
         return self.manager.world
 
     @property
@@ -36,7 +36,10 @@ class Controller:
         return self.manager.is_creation_end
 
     def get_layer_num_tiles(self, layer_name: LayerName):
-        return self.manager.get_layer(layer_name).num_tiles
+        layer = self.manager.get_layer(layer_name)
+        if not layer:
+            raise ValueError()
+        return layer.num_tiles
 
     def save(self):
         self.storage.save_world(self._world_id, self.world)
@@ -48,7 +51,7 @@ class Controller:
         value = self.manager.calc_action_cost(action)
         self.manager.spend_force(god_id=self._god_id, value=value)
 
-    def render_map(self, layer_name: str = None):
+    def render_map(self, layer_name: str = ''):
         layer_names = {l_name.value: l_name for l_name in LayerName}
         return self.manager.render_map(layer_names.get(layer_name))
 
@@ -160,7 +163,7 @@ class GodController(Controller):
 
 
 class GodActionController(Controller):
-    def _add_tile_on_layer(self, position: int, image_ref: str, layer_name: LayerName):
+    def _add_tile_on_layer(self, position: int, image_ref: Optional[str], layer_name: LayerName):
         tile = Tile(position=position, image_ref=image_ref, creator=self.current_god.name)
         self.manager.change_tile(layer_name, tile)
         return tile
@@ -173,9 +176,11 @@ class GodActionController(Controller):
         self.save()
 
     def form_climate(self, tile_type: str, tile_num: int):
-        if tile_type == ClimateType.CLEAR.value:
-            tile_type = None
-        tile = self._add_tile_on_layer(position=tile_num, image_ref=tile_type, layer_name=LayerName.CLIMATE)
+        tile = self._add_tile_on_layer(
+            position=tile_num,
+            image_ref=tile_type if tile_type != ClimateType.CLEAR.value else None,
+            layer_name=LayerName.CLIMATE
+        )
 
         self.spend_force(Actions.CREATE_CLIMATE)
         self.manager.log(f'{self.current_god} изменил климат в координатах {tile.position} на {tile}')

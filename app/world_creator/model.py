@@ -145,7 +145,9 @@ class World(BaseModel):
 
     @property
     def info(self) -> str:
-        redactor_god_name = getattr(self.gods.get(self.redactor_god_id), 'name', '')
+        redactor_god_name = ''
+        if self.redactor_god_id is not None:
+            redactor_god_name = getattr(self.gods.get(self.redactor_god_id), 'name', '')
 
         return f'Мир: {self.name},\n' \
                f'Эпоха: {self.n_era} \n' \
