@@ -59,6 +59,8 @@
 3) Менеджер изображений
 4) Контроллер для использования фронтом
 
+![Начало](https://github.com/dmitriyStepanenko/dawn_of_the_worlds/raw/some_images/world_creator_uml.png)
+
 Рассмотрим подробно все эти пункты:
 
 ### Данные, объекты и управление ими
